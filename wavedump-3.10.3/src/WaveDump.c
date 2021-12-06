@@ -2082,6 +2082,8 @@ Restart:
     /* Read data from the board */
     ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
 
+    CAEN_DGTZ_SWStopAcquisition(handle);
+
     if (ret) {
         ErrCode = ERR_READOUT;
         goto QuitProgram;
@@ -2100,6 +2102,7 @@ Restart:
 
     static float wfdata[1000][32][1024];
     float baselines[32];
+    float thresholds[2];
 
     int chmask = 0;
     int nsamples = 0;
@@ -2155,11 +2158,141 @@ Restart:
 
     get_baselines(wfdata, baselines, NumEvents, chmask, nsamples);
 
+    for (i = 0; i < 2; i++)
+        thresholds[i] = 1e99;
+
     for (i = 0; i < 32; i++) {
         if (chmask & (1 << i)) {
             printf("baseline for ch %i is %f\n", i, baselines[i]);
+
+            if (baselines[i] < thresholds[i/8])
+                thresholds[i/8] = baselines[i];
         }
     }
+
+    for (i = 0; i < 2; i++) {
+        thresholds[i] -= 100;
+
+        if (thresholds[i] < 1e99) {
+            printf("thresholds[%i] = %i\n", i, (int) thresholds[i]);
+            ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, (int) thresholds[i]);
+
+            if (ret) {
+                fprintf(stderr, "failed to write register 0x%04x!\n", 0x1080 + 256*i);
+                goto QuitProgram;
+            }
+
+            ret = CAEN_DGTZ_WriteRegister(handle, 0x10A8 + 256*i, (int) (chmask >> i*8) & 0xff);
+
+            if (ret) {
+                fprintf(stderr, "failed to write register 0x%04x!\n", 0x10A8 + 256*i);
+                goto QuitProgram;
+            }
+        } else {
+            ret = CAEN_DGTZ_WriteRegister(handle, 0x10A8 + 256*i, 0);
+
+            if (ret) {
+                fprintf(stderr, "failed to write register 0x%04x!\n", 0x10A8 + 256*i);
+                goto QuitProgram;
+            }
+        }
+    }
+
+    printf("setting mode to output mode\n");
+    ret = 0;
+    ret = CAEN_DGTZ_ReadRegister(handle, 0x8000, &data);
+
+    if (ret) {
+        printf("ret = %i\n", ret);
+        fprintf(stderr, "failed to read register 0x8000!\n");
+        goto QuitProgram;
+    }
+
+    data &= ~(1 << 13);
+
+    ret = CAEN_DGTZ_WriteRegister(handle, 0x8000, data);
+
+    if (ret) {
+        fprintf(stderr, "failed to write register 0x8000!\n");
+        goto QuitProgram;
+    }
+
+    CAEN_DGTZ_SWStartAcquisition(handle);
+
+    for (i = 0; i < 10; i++) {
+        /* Read data from the board */
+        ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
+
+        CAEN_DGTZ_SWStopAcquisition(handle);
+
+        if (ret) {
+            ErrCode = ERR_READOUT;
+            goto QuitProgram;
+        }
+
+        NumEvents = 0;
+        if (BufferSize != 0) {
+            ret = CAEN_DGTZ_GetNumEvents(handle, buffer, BufferSize, &NumEvents);
+            if (ret) {
+                ErrCode = ERR_READOUT;
+                goto QuitProgram;
+            }
+        }
+
+        printf("got %i events\n", NumEvents);
+
+        /* Analyze data */
+        for(i = 0; i < (int)NumEvents; i++) {
+            /* Get one event from the readout buffer */
+            ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
+            if (ret) {
+                ErrCode = ERR_EVENT_BUILD;
+                goto QuitProgram;
+            }
+
+            ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
+
+            if (ret) {
+                ErrCode = ERR_EVENT_BUILD;
+                goto QuitProgram;
+            }
+
+            if (WDcfg.useCorrections != -1) { // if manual corrections
+                uint32_t gr;
+                for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
+                    if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
+                        continue;
+                }
+            }
+
+            for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
+                if (Event742->GrPresent[gr]) {
+                    for (ch = 0; ch < 9; ch++) {
+                        int Size = Event742->DataGroup[gr].ChSize[ch];
+                        if (Size <= 0) {
+                            continue;
+                        }
+
+                        nsamples = Size;
+
+                        chmask |= 1 << (gr*9 + ch);
+                        char filename[256];
+                        sprintf(filename, "channel_%i_%i.txt", gr*9 + ch, i);
+                        FILE *f = fopen(filename, "w");
+                        for(int j = 0; j < Size; j++) {
+                            fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
+                            wfdata[i][gr*9 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                        }
+                        fclose(f);
+                    }
+                }
+            }
+        }
+
+        usleep(100000);
+    }
+
+    CAEN_DGTZ_SWStopAcquisition(handle);
 
     exit(0);
     /* *************************************************************************************** */
