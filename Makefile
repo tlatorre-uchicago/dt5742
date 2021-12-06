@@ -12,7 +12,7 @@ install-deps: CAENUSBdrvB-1.5.4/CAENUSBdrvB.o
 wavedump-3.10.3/src/wavedump/src/Makefile:
 	cd wavedump-3.10.3 && ./configure
 
-wavedump-3.10.3/src/wavedump: wavedump-3.10.3/src/Makefile
+wavedump-3.10.3/src/wavedump: wavedump-3.10.3/src/Makefile wavedump-3.10.3/src/WaveDump.c
 	$(MAKE) -C wavedump-3.10.3
 
 install: CAENUSBdrvB-1.5.4/CAENUSBdrvB.o

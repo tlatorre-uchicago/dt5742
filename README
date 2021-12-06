@@ -1,0 +1,39 @@
+Installation
+------------
+
+These installation instructions have only been tested on Fedora 34, but they
+should work on any recent Fedora, RHEL, CentOS, or Rocky Linux version.
+
+First, you should install gnuplot with either:
+
+```
+$ sudo dnf install gnuplot
+```
+
+or
+
+```
+$ sudo yum install gnuplot
+```
+
+Then, install the dependencies
+
+```
+$ sudo make install-deps
+```
+
+Finally, you can build the wavedump program:
+
+```
+$ make
+```
+
+Running
+-------
+
+You can run the wavedump software by running:
+
+```
+$ cd wavedump-3.10.3
+$ ./src/wavedump WaveDumpConfig_X742.txt
+```
