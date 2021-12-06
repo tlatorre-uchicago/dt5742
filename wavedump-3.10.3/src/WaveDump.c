@@ -2075,6 +2075,51 @@ Restart:
 
     printf("got %i events\n", NumEvents);
 
+    /* Analyze data */
+    for(i = 0; i < (int)NumEvents; i++) {
+        /* Get one event from the readout buffer */
+        ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
+        if (ret) {
+            ErrCode = ERR_EVENT_BUILD;
+            goto QuitProgram;
+        }
+
+        ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
+
+        if (ret) {
+            ErrCode = ERR_EVENT_BUILD;
+            goto QuitProgram;
+        }
+
+        if (WDcfg.useCorrections != -1) { // if manual corrections
+            uint32_t gr;
+            for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
+                if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
+                    continue;
+                ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
+            }
+        }
+
+        for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
+            if (Event742->GrPresent[gr]) {
+                for (ch = 0; ch < 9; ch++) {
+                    int Size = Event742->DataGroup[gr].ChSize[ch];
+                    if (Size <= 0) {
+                        continue;
+                    }
+
+                    char filename[256];
+                    sprintf(filename, "channel_%i_%i.txt", gr*9 + ch, i);
+                    FILE *f = fopen(filename, "w");
+                    for(int j = 0; j < Size; j++) {
+                        fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
+                    }
+                    fclose(f);
+                }
+            }
+        }
+    }
+
     exit(0);
     /* *************************************************************************************** */
     /* Readout Loop                                                                            */

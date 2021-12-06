@@ -85,7 +85,7 @@ CORRECTION_LEVEL AUTO
 #   1 = 2.5 GHz
 #   2 = 1 GHz
 #   3 = 750 MHz
-DRS4_FREQUENCY 0
+DRS4_FREQUENCY 1
 
 # OUTPUT_FILE_FORMAT: output file can be either ASCII (column of decimal numbers) or binary 
 # (2 bytes per sample)
@@ -127,7 +127,7 @@ FPIO_LEVEL  NIM
 
 # ENABLE_INPUT: enable/disable one group of channels 
 # options: YES, NO
-ENABLE_INPUT          NO
+ENABLE_INPUT          YES
 
 # DC_OFFSET: DC offset adjust (DAC channel setting) in percent of the Full Scale. 
 # For model 742* the DC offset adjust is the same for all channels in the group 
