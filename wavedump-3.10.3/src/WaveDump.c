@@ -2128,13 +2128,14 @@ Restart:
             for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
                 if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
                     continue;
-                //ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
+                printf("applying corrections\n");
+                ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
             }
         }
 
         for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
             if (Event742->GrPresent[gr]) {
-                for (ch = 0; ch < 9; ch++) {
+                for (ch = 0; ch < 8; ch++) {
                     int Size = Event742->DataGroup[gr].ChSize[ch];
                     if (Size <= 0) {
                         continue;
@@ -2142,13 +2143,14 @@ Restart:
 
                     nsamples = Size;
 
-                    chmask |= 1 << (gr*9 + ch);
+                    chmask |= 1 << (gr*8 + ch);
                     char filename[256];
-                    sprintf(filename, "channel_%i_%i.txt", gr*9 + ch, i);
+                    printf("size = %i\n", Size);
+                    sprintf(filename, "channel_%i_%i.txt", gr*8 + ch, i);
                     FILE *f = fopen(filename, "w");
                     for(int j = 0; j < Size; j++) {
                         fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
-                        wfdata[i][gr*9 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                        wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                     }
                     fclose(f);
                 }
@@ -2171,10 +2173,11 @@ Restart:
     }
 
     for (i = 0; i < 2; i++) {
-        thresholds[i] -= 100;
+        thresholds[i] -= 50;
 
         if (thresholds[i] < 1e99) {
-            printf("thresholds[%i] = %i\n", i, (int) thresholds[i]);
+            thresholds[i] = 2500;
+            printf("setting trigger threshold for group %i to %i\n", i, (int) thresholds[i]);
             ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, (int) thresholds[i]);
 
             if (ret) {
@@ -2182,7 +2185,8 @@ Restart:
                 goto QuitProgram;
             }
 
-            ret = CAEN_DGTZ_WriteRegister(handle, 0x10A8 + 256*i, (int) (chmask >> i*8) & 0xff);
+            printf("setting channel mask for group %i to 0x%02x\n", i, (int) (chmask >> i*16) & 0xff);
+            ret = CAEN_DGTZ_WriteRegister(handle, 0x10A8 + 256*i, (int) (chmask >> i*16) & 0xff);
 
             if (ret) {
                 fprintf(stderr, "failed to write register 0x%04x!\n", 0x10A8 + 256*i);
@@ -2267,7 +2271,7 @@ Restart:
 
             for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
                 if (Event742->GrPresent[gr]) {
-                    for (ch = 0; ch < 9; ch++) {
+                    for (ch = 0; ch < 8; ch++) {
                         int Size = Event742->DataGroup[gr].ChSize[ch];
                         if (Size <= 0) {
                             continue;
@@ -2275,13 +2279,13 @@ Restart:
 
                         nsamples = Size;
 
-                        chmask |= 1 << (gr*9 + ch);
+                        chmask |= 1 << (gr*8 + ch);
                         char filename[256];
-                        sprintf(filename, "channel_%i_%i.txt", gr*9 + ch, i);
+                        sprintf(filename, "channel_%i_%i.txt", gr*8 + ch, i);
                         FILE *f = fopen(filename, "w");
                         for(int j = 0; j < Size; j++) {
                             fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
-                            wfdata[i][gr*9 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                            wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                         }
                         fclose(f);
                     }
