@@ -2002,6 +2002,80 @@ Restart:
         printf("[s] start/stop the acquisition, [q] quit, [SPACE] help\n");
     WDrun.Restart = 0;
     PrevRateTime = get_time();
+
+    CAEN_DGTZ_SWStopAcquisition(handle);
+
+    printf("setting mode to transparent mode\n");
+    uint32_t address, data;
+    ret = 0;
+    ret = CAEN_DGTZ_ReadRegister(handle, 0x8000, &data);
+
+    if (ret) {
+        printf("ret = %i\n", ret);
+        fprintf(stderr, "failed to read register 0x8000!\n");
+        goto QuitProgram;
+    }
+
+    data |= 1 << 13;
+
+    ret = CAEN_DGTZ_WriteRegister(handle, 0x8000, data);
+
+    if (ret) {
+        fprintf(stderr, "failed to write register 0x8000!\n");
+        goto QuitProgram;
+    }
+
+    //printf("setting interrupt config\n");
+    //ret = CAEN_DGTZ_SetInterruptConfig(handle, CAEN_DGTZ_ENABLE, VME_INTERRUPT_LEVEL, VME_INTERRUPT_STATUS_ID, 10, INTERRUPT_MODE);
+
+    //if (ret) {
+    //    fprintf(stderr, "Error configuring interrupts!\n");
+    //    goto QuitProgram;
+    //}
+    //
+    //ret |= CAEN_DGTZ_SetMaxNumEventsBLT(handle, 1000);
+    //ret |= CAEN_DGTZ_SetAcquisitionMode(handle, CAEN_DGTZ_SW_CONTROLLED);
+    //ret |= CAEN_DGTZ_SetExtTriggerInputMode(handle, WDcfg.ExtTriggerMode);
+
+    printf("starting acquisition\n");
+    CAEN_DGTZ_SWStartAcquisition(handle);
+
+    for (i = 0; i < 10; i++) {
+        printf("sending sw trigger\n");
+        CAEN_DGTZ_SendSWtrigger(handle);
+        usleep(1000);
+
+        //ret = CAEN_DGTZ_IRQWait(handle, INTERRUPT_TIMEOUT);
+
+        //if (ret == CAEN_DGTZ_Timeout) {
+        //    printf("timeout\n");
+        //    continue;
+        //} else if (ret != CAEN_DGTZ_Success)  {
+        //    ErrCode = ERR_INTERRUPT;
+        //    goto QuitProgram;
+        //}
+    }
+
+    /* Read data from the board */
+    ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
+
+    if (ret) {
+        ErrCode = ERR_READOUT;
+        goto QuitProgram;
+    }
+
+    NumEvents = 0;
+    if (BufferSize != 0) {
+        ret = CAEN_DGTZ_GetNumEvents(handle, buffer, BufferSize, &NumEvents);
+        if (ret) {
+            ErrCode = ERR_READOUT;
+            goto QuitProgram;
+        }
+    }
+
+    printf("got %i events\n", NumEvents);
+
+    exit(0);
     /* *************************************************************************************** */
     /* Readout Loop                                                                            */
     /* *************************************************************************************** */
