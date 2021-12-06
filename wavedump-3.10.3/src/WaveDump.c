@@ -1706,6 +1706,29 @@ int WriteOutputFilesx742(WaveDumpConfig_t *WDcfg, WaveDumpRun_t *WDrun, CAEN_DGT
 
 }
 
+void get_baselines(float data[1000][32][1024], float *baselines, int n, int chmask, int nsamples)
+{
+    int i, j, k;
+
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < 32; j++) {
+            if (!(chmask & (1 << j))) {
+                baselines[j] = 0;
+                continue;
+            }
+
+            baselines[j] = 0;
+            for (k = 0; k < nsamples; k++) {
+                baselines[j] += data[i][j][k];
+            }
+        }
+    }
+
+    for (j = 0; j < 32; j++) {
+        baselines[j] /= n*nsamples;
+    }
+}
+
 /* ########################################################################### */
 /* MAIN                                                                        */
 /* ########################################################################### */
@@ -2075,6 +2098,12 @@ Restart:
 
     printf("got %i events\n", NumEvents);
 
+    static float wfdata[1000][32][1024];
+    float baselines[32];
+
+    int chmask = 0;
+    int nsamples = 0;
+
     /* Analyze data */
     for(i = 0; i < (int)NumEvents; i++) {
         /* Get one event from the readout buffer */
@@ -2096,7 +2125,7 @@ Restart:
             for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
                 if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
                     continue;
-                ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
+                //ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
             }
         }
 
@@ -2108,15 +2137,27 @@ Restart:
                         continue;
                     }
 
+                    nsamples = Size;
+
+                    chmask |= 1 << (gr*9 + ch);
                     char filename[256];
                     sprintf(filename, "channel_%i_%i.txt", gr*9 + ch, i);
                     FILE *f = fopen(filename, "w");
                     for(int j = 0; j < Size; j++) {
                         fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
+                        wfdata[i][gr*9 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                     }
                     fclose(f);
                 }
             }
+        }
+    }
+
+    get_baselines(wfdata, baselines, NumEvents, chmask, nsamples);
+
+    for (i = 0; i < 32; i++) {
+        if (chmask & (1 << i)) {
+            printf("baseline for ch %i is %f\n", i, baselines[i]);
         }
     }
 
