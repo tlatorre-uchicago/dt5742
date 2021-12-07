@@ -7,11 +7,19 @@
 #include "X742CorrectionRoutines.h"
 #include "hdf5.h"
 #include "unistd.h" /* for access(). */
+#include "signal.h" /* for SIGINT. */
 
 extern int dc_file[MAX_CH];
 extern int thr_file[MAX_CH];
 int cal_ok[MAX_CH] = { 0 };
 char path[128];
+
+int stop = 0;
+
+void sigint_handler(int dummy)
+{
+    stop = 1;
+}
 
 /* Error messages */
 typedef enum  {
@@ -1934,6 +1942,8 @@ int main(int argc, char *argv[])
     if (!config_filename || !output_filename)
         print_help();
 
+    signal(SIGINT, sigint_handler);
+
     memset(&WDrun, 0, sizeof(WDrun));
     memset(&WDcfg, 0, sizeof(WDcfg));
 
@@ -2299,7 +2309,7 @@ Restart:
 
     int nread = 0;
 
-    while (total_events < nevents) {
+    while (!stop && total_events < nevents) {
         /* Read data from the board */
         printf("sending sw trigger\n");
 	CAEN_DGTZ_SendSWtrigger(handle);
@@ -2367,11 +2377,14 @@ Restart:
             }
         }
 
-        if (nread > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
-            goto QuitProgram;
-        }
-
         usleep(100000);
+    }
+
+    if (stop)
+        fprintf(stderr, "ctrl-c caught. writing out %i events\n", nread);
+
+    if (nread > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
+        goto QuitProgram;
     }
 
     CAEN_DGTZ_SWStopAcquisition(handle);
