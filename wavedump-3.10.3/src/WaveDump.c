@@ -1,46 +1,3 @@
-/******************************************************************************
-*
-* CAEN SpA - Front End Division
-* Via Vetraia, 11 - 55049 - Viareggio ITALY
-* +390594388398 - www.caen.it
-*
-***************************************************************************//**
-* \note TERMS OF USE:
-* This program is free software; you can redistribute it and/or modify it under
-* the terms of the GNU General Public License as published by the Free Software
-* Foundation. This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. The user relies on the
-* software, documentation and results solely at his own risk.
-*
-*  Description:
-*  -----------------------------------------------------------------------------
-*  This is a demo program that can be used with any model of the CAEN's
-*  digitizer family. The purpose of WaveDump is to configure the digitizer,
-*  start the acquisition, read the data and write them into output files
-*  and/or plot the waveforms using 'gnuplot' as an external plotting tool.
-*  The configuration of the digitizer (registers setting) is done by means of
-*  a configuration file that contains a list of parameters.
-*  This program uses the CAENDigitizer library which is then based on the
-*  CAENComm library for the access to the devices through any type of physical
-*  channel (VME, Optical Link, USB, etc...). The CAENComm support the following
-*  communication paths:
-*  PCI => A2818 => OpticalLink => Digitizer (any type)
-*  PCI => V2718 => VME => Digitizer (only VME models)
-*  USB => Digitizer (only Desktop or NIM models)
-*  USB => V1718 => VME => Digitizer (only VME models)
-*  If you have want to sue a VME digitizer with a different VME controller
-*  you must provide the functions of the CAENComm library.
-*
-*  -----------------------------------------------------------------------------
-*  Syntax: WaveDump [ConfigFile]
-*  Default config file is "WaveDumpConfig.txt"
-******************************************************************************/
-
-#define WaveDump_Release        "3.10.3"
-#define WaveDump_Release_Date   "June 2021"
-#define DBG_TIME
-
 #include <CAENDigitizer.h>
 #include "WaveDump.h"
 #include "WDconfig.h"
@@ -48,6 +5,8 @@
 #include "fft.h"
 #include "keyb.h"
 #include "X742CorrectionRoutines.h"
+#include "hdf5.h"
+#include "unistd.h" /* for access(). */
 
 extern int dc_file[MAX_CH];
 extern int thr_file[MAX_CH];
@@ -1729,6 +1688,178 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
     }
 }
 
+int add_to_output_file(char *filename, float data[1000][32][1024], int n, int chmask, int nsamples)
+{
+    hid_t file, space, dset, dcpl;    /* Handles */
+    herr_t          status;
+    htri_t          avail;
+    int ndims;
+    hsize_t dims[2], chunk[2], extdims[2], maxdims[2];
+    char dset_name[256];
+    hsize_t start[2], count[2];
+    int i, j, k;
+    unsigned int    flags,
+                    filter_info;
+
+    chunk[0] = 100;
+    chunk[1] = 1024;
+
+    /* Check if file exists. */
+    if (access(filename, F_OK) != 0) {
+        /* File doesn't exist. Create it. */
+
+        /* Check if gzip compression is available and can be used for both
+         * compression and decompression.  Normally we do not perform error
+         * checking in these examples for the sake of clarity, but in this
+         * case we will make an exception because this filter is an
+         * optional part of the hdf5 library. */
+        avail = H5Zfilter_avail(H5Z_FILTER_DEFLATE);
+        if (!avail) {
+            fprintf(stderr, "gzip filter not available.\n");
+            return 1;
+        }
+
+        status = H5Zget_filter_info(H5Z_FILTER_DEFLATE, &filter_info);
+
+        if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) || !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+            fprintf(stderr, "gzip filter not available for encoding and decoding.\n");
+            return 1;
+        }
+
+        /*
+         * Create a new file using the default properties.
+         */
+        file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+        for (i = 0; i < 32; i++) {
+            if (!(chmask & (1 << i))) continue;
+            /* Create dataspace with unlimited dimensions. */
+            maxdims[0] = H5S_UNLIMITED;
+            maxdims[1] = H5S_UNLIMITED;
+            dims[0] = n;
+            dims[1] = nsamples;
+            space = H5Screate_simple(2, dims, maxdims);
+
+            /* Create the dataset creation property list, add the gzip compression
+             * filter and set the chunk size. */
+            dcpl = H5Pcreate(H5P_DATASET_CREATE);
+            status = H5Pset_deflate(dcpl, 9);
+            status = H5Pset_chunk(dcpl, 2, chunk);
+
+            sprintf(dset_name, "ch%i", i);
+
+            float *wdata = malloc(n*nsamples*sizeof(float));
+
+            for (j = 0; j < n; j++)
+                for (k = 0; k < nsamples; k++)
+                    wdata[j*nsamples + k] = data[j][i][k];
+
+            /* Create the compressed unlimited dataset. */
+            dset = H5Dcreate(file, dset_name, H5T_IEEE_F32BE, space, H5P_DEFAULT, dcpl, H5P_DEFAULT);
+
+            /* Write the data to the dataset. */
+            status = H5Dwrite(dset, H5T_IEEE_F32BE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
+
+            free(wdata);
+
+            /* Close and release resources. */
+            status = H5Pclose(dcpl);
+            status = H5Dclose(dset);
+            status = H5Sclose(space);
+
+            if (status) {
+                fprintf(stderr, "error closing hdf5 resources.\n");
+                return 1;
+            }
+        }
+        status = H5Fclose(file);
+
+        if (status) {
+            fprintf(stderr, "error closing hdf5 file.\n");
+            return 1;
+        }
+    }
+
+
+    /* Open file and dataset using the default properties. */
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    for (i = 0; i < 32; i++) {
+        sprintf(dset_name, "ch%i", i);
+        dset = H5Dopen (file, dset_name, H5P_DEFAULT);
+
+        /* Get dataspace and allocate memory for read buffer.  This is a
+         * two dimensional dataset so the dynamic allocation must be done
+         * in steps. */
+        space = H5Dget_space(dset);
+        ndims = H5Sget_simple_extent_dims(space, dims, NULL);
+
+        extdims[0] = n;
+        extdims[1] = nsamples;
+
+        /* Extend the dataset. */
+        status = H5Dset_extent(dset, extdims);
+
+        if (status) {
+            fprintf(stderr, "error extending dataset.\n");
+            return 1;
+        }
+
+        /* Retrieve the dataspace for the newly extended dataset. */
+        space = H5Dget_space(dset);
+
+        /* Select the entire dataspace. */
+        status = H5Sselect_all(space);
+
+        if (status) {
+            fprintf(stderr, "error selecting dataspace.\n");
+            return 1;
+        }
+
+        /* Subtract a hyperslab reflecting the original dimensions from the
+         * selection.  The selection now contains only the newly extended
+         * portions of the dataset. */
+        start[0] = 0;
+        start[1] = 0;
+        count[0] = dims[0];
+        count[1] = dims[1];
+        status = H5Sselect_hyperslab(space, H5S_SELECT_NOTB, start, NULL, count, NULL);
+
+        float *wdata = malloc(n*nsamples*sizeof(float));
+
+        for (j = 0; j < n; j++)
+            for (k = 0; k < nsamples; k++)
+                wdata[j*nsamples + k] = data[j][i][k];
+
+        /* Write the data to the selected portion of the dataset. */
+        status = H5Dwrite (dset, H5T_NATIVE_INT, H5S_ALL, space, H5P_DEFAULT, wdata);
+
+        /* Close and release resources. */
+        free(wdata);
+        status = H5Dclose(dset);
+        status = H5Sclose(space);
+
+        if (status) {
+            fprintf(stderr, "error closing hdf5 resources.\n");
+            return 1;
+        }
+    }
+
+    status = H5Fclose(file);
+
+    if (status) {
+        fprintf(stderr, "error closing hdf5 file.\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+void print_help()
+{
+    fprintf(stderr, "usage: wavedump -o [OUTPUT] -n [NUMBER] CONFIG_FILE\n");
+    exit(1);
+}
+
 /* ########################################################################### */
 /* MAIN                                                                        */
 /* ########################################################################### */
@@ -1749,6 +1880,9 @@ int main(int argc, char *argv[])
     int nCycles= 0;
     CAEN_DGTZ_BoardInfo_t       BoardInfo;
     CAEN_DGTZ_EventInfo_t       EventInfo;
+    char *config_filename = NULL;
+    char *output_filename = NULL;
+    int nevents = 100;
 
     CAEN_DGTZ_UINT16_EVENT_t    *Event16=NULL; /* generic event struct with 16 bit data (10, 12, 14 and 16 bit digitizers */
 
@@ -1765,30 +1899,34 @@ int main(int argc, char *argv[])
 #endif
     int ReloadCfgStatus = 0x7FFFFFFF; // Init to the bigger positive number
 
-    printf("\n");
-    printf("**************************************************************\n");
-    printf("                        Wave Dump %s\n", WaveDump_Release);
-    printf("**************************************************************\n");
+    for (i = 0; i < argc; i++) {
+        if (!strcmp(argv[i],"-n") && i < argc - 1) {
+            nevents = atoi(argv[++i]);
+        } else if (!strcmp(argv[i],"-o") && i < argc - 1) {
+            output_filename = argv[++i];
+        } else if (!strcmp(argv[i],"-h")) {
+            print_help();
+        } else {
+            config_filename = argv[i];
+        }
+    }
 
-	/* *************************************************************************************** */
-	/* Open and parse default configuration file                                                       */
-	/* *************************************************************************************** */
-	memset(&WDrun, 0, sizeof(WDrun));
-	memset(&WDcfg, 0, sizeof(WDcfg));
+    if (!config_filename || !output_filename)
+        print_help();
 
-	if (argc > 1)//user entered custom filename
-		strcpy(ConfigFileName, argv[1]);
-	else 
-		strcpy(ConfigFileName, DEFAULT_CONFIG_FILE);
+    memset(&WDrun, 0, sizeof(WDrun));
+    memset(&WDcfg, 0, sizeof(WDcfg));
 
-	printf("Opening Configuration File %s\n", ConfigFileName);
-	f_ini = fopen(ConfigFileName, "r");
-	if (f_ini == NULL) {
-		ErrCode = ERR_CONF_FILE_NOT_FOUND;
-		goto QuitProgram;
-	}
-	ParseConfigFile(f_ini, &WDcfg);
-	fclose(f_ini);
+    strcpy(ConfigFileName, config_filename);
+
+    printf("Opening Configuration File %s\n", ConfigFileName);
+    f_ini = fopen(ConfigFileName, "r");
+    if (f_ini == NULL) {
+        fprintf(stderr, "couldn't find configuration file '%s'\n", ConfigFileName);
+        goto QuitProgram;
+    }
+    ParseConfigFile(f_ini, &WDcfg);
+    fclose(f_ini);
 
     /* *************************************************************************************** */
     /* Open the digitizer and read the board information                                       */
@@ -1797,12 +1935,13 @@ int main(int argc, char *argv[])
 
     ret = CAEN_DGTZ_OpenDigitizer2(WDcfg.LinkType, (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum), WDcfg.ConetNode, WDcfg.BaseAddress, &handle);
     if (ret) {
-        ErrCode = ERR_DGZ_OPEN;
+        fprintf(stderr, "unable to open digitizer! Is it turned on?\n");
         goto QuitProgram;
     }
 
     ret = CAEN_DGTZ_GetInfo(handle, &BoardInfo);
     if (ret) {
+        fprintf(stderr, "unable to get board info.\n");
         ErrCode = ERR_BOARD_INFO_READ;
         goto QuitProgram;
     }
@@ -2293,352 +2432,16 @@ Restart:
             }
         }
 
+        if (NumEvents > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
+            goto QuitProgram;
+        }
+
         usleep(100000);
     }
 
     CAEN_DGTZ_SWStopAcquisition(handle);
 
-    exit(0);
-    /* *************************************************************************************** */
-    /* Readout Loop                                                                            */
-    /* *************************************************************************************** */
-    while(!WDrun.Quit) {		
-        // Check for keyboard commands (key pressed)
-        CheckKeyboardCommands(handle, &WDrun, &WDcfg, BoardInfo);
-        if (WDrun.Restart) {
-            CAEN_DGTZ_SWStopAcquisition(handle);
-            CAEN_DGTZ_FreeReadoutBuffer(&buffer);
-            ClosePlotter();
-            PlotVar = NULL;
-            if(WDcfg.Nbit == 8)
-                CAEN_DGTZ_FreeEvent(handle, (void**)&Event8);
-            else
-                if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE) {
-                    CAEN_DGTZ_FreeEvent(handle, (void**)&Event16);
-                }
-                else {
-                    CAEN_DGTZ_FreeEvent(handle, (void**)&Event742);
-                }
-                f_ini = fopen(ConfigFileName, "r");
-                ReloadCfgStatus = ParseConfigFile(f_ini, &WDcfg);
-                fclose(f_ini);
-                goto Restart;
-        }
-        if (WDrun.AcqRun == 0)
-            continue;
-
-        /* Send a software trigger */
-        if (WDrun.ContinuousTrigger) {
-            CAEN_DGTZ_SendSWtrigger(handle);
-        }
-
-        /* Wait for interrupt (if enabled) */
-        if (WDcfg.InterruptNumEvents > 0) {
-            int32_t boardId;
-            int VMEHandle = -1;
-            int InterruptMask = (1 << VME_INTERRUPT_LEVEL);
-
-            BufferSize = 0;
-            NumEvents = 0;
-            // Interrupt handling
-            if (isVMEDevice) {
-                ret = CAEN_DGTZ_VMEIRQWait ((CAEN_DGTZ_ConnectionType)WDcfg.LinkType, WDcfg.LinkNum, WDcfg.ConetNode, (uint8_t)InterruptMask, INTERRUPT_TIMEOUT, &VMEHandle);
-            }
-            else
-                ret = CAEN_DGTZ_IRQWait(handle, INTERRUPT_TIMEOUT);
-            if (ret == CAEN_DGTZ_Timeout)  // No active interrupt requests
-                goto InterruptTimeout;
-            if (ret != CAEN_DGTZ_Success)  {
-                ErrCode = ERR_INTERRUPT;
-                goto QuitProgram;
-            }
-            // Interrupt Ack
-            if (isVMEDevice) {
-                ret = CAEN_DGTZ_VMEIACKCycle(VMEHandle, VME_INTERRUPT_LEVEL, &boardId);
-                if ((ret != CAEN_DGTZ_Success) || (boardId != VME_INTERRUPT_STATUS_ID)) {
-                    goto InterruptTimeout;
-                } else {
-                    if (INTERRUPT_MODE == CAEN_DGTZ_IRQ_MODE_ROAK)
-                        ret = CAEN_DGTZ_RearmInterrupt(handle);
-                }
-            }
-        }
-
-        /* Read data from the board */
-         ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
-        if (ret) {
-
-            ErrCode = ERR_READOUT;
-            goto QuitProgram;
-        }
-        NumEvents = 0;
-        if (BufferSize != 0) {
-            ret = CAEN_DGTZ_GetNumEvents(handle, buffer, BufferSize, &NumEvents);
-            if (ret) {
-                ErrCode = ERR_READOUT;
-                goto QuitProgram;
-            }
-        }
-		else {
-			uint32_t lstatus;
-			ret = CAEN_DGTZ_ReadRegister(handle, CAEN_DGTZ_ACQ_STATUS_ADD, &lstatus);
-			if (ret) {
-				printf("Warning: Failure reading reg:%x (%d)\n", CAEN_DGTZ_ACQ_STATUS_ADD, ret);
-			}
-			else {
-				if (lstatus & (0x1 << 19)) {
-					ErrCode = ERR_OVERTEMP;
-					goto QuitProgram;
-				}
-			}
-		}
-InterruptTimeout:
-        /* Calculate throughput and trigger rate (every second) */
-        Nb += BufferSize;
-        Ne += NumEvents;
-        CurrentTime = get_time();
-        ElapsedTime = CurrentTime - PrevRateTime;
-
-        nCycles++;
-        if (ElapsedTime > 1000) {
-            if (Nb == 0)
-                if (ret == CAEN_DGTZ_Timeout) printf ("Timeout...\n"); else printf("No data...\n");
-            else
-                printf("Reading at %.2f MB/s (Trg Rate: %.2f Hz)\n", (float)Nb/((float)ElapsedTime*1048.576f), (float)Ne*1000.0f/(float)ElapsedTime);
-            nCycles= 0;
-            Nb = 0;
-            Ne = 0;
-            PrevRateTime = CurrentTime;
-        }
-
-        /* Analyze data */
-        for(i = 0; i < (int)NumEvents; i++) {
-
-            /* Get one event from the readout buffer */
-            ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
-            if (ret) {
-                ErrCode = ERR_EVENT_BUILD;
-                goto QuitProgram;
-            }
-            /* decode the event */
-            if (WDcfg.Nbit == 8) 
-                ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event8);
-            else
-                if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE) {
-                    ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event16);
-                }
-                else {
-                    ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
-                    if (WDcfg.useCorrections != -1) { // if manual corrections
-                        uint32_t gr;
-                        for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
-                            if ( ((WDcfg.EnableMask >> gr) & 0x1) == 0)
-                                continue;
-                            ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
-                        }
-                    }
-                }
-                if (ret) {
-                    ErrCode = ERR_EVENT_BUILD;
-                    goto QuitProgram;
-                }
-
-                /* Update Histograms */
-                if (WDrun.RunHisto) {
-                    for(ch=0; ch<WDcfg.Nch; ch++) {
-                        int chmask = ((BoardInfo.FamilyCode == CAEN_DGTZ_XX740_FAMILY_CODE) || (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) )? (ch/8) : ch;
-                        if (!(EventInfo.ChannelMask & (1<<chmask)))
-                            continue;
-                        if (WDrun.Histogram[ch] == NULL) {
-                            if ((WDrun.Histogram[ch] = malloc((uint64_t)(1<<WDcfg.Nbit) * sizeof(uint32_t))) == NULL) {
-                                ErrCode = ERR_HISTO_MALLOC;
-                                goto QuitProgram;
-                            }
-                            memset(WDrun.Histogram[ch], 0, (uint64_t)(1<<WDcfg.Nbit) * sizeof(uint32_t));
-                        }
-                        if (WDcfg.Nbit == 8)
-                            for(i=0; i<(int)Event8->ChSize[ch]; i++)
-                                WDrun.Histogram[ch][Event8->DataChannel[ch][i]]++;
-                        else {
-                            if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE) {
-                                for(i=0; i<(int)Event16->ChSize[ch]; i++)
-                                    WDrun.Histogram[ch][Event16->DataChannel[ch][i]]++;
-                            }
-                            else {
-                                printf("Can't build samples histogram for this board: it has float samples.\n");
-                                WDrun.RunHisto = 0;
-								WDrun.PlotType = PLOT_WAVEFORMS;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                /* Write Event data to file */
-                if (WDrun.ContinuousWrite || WDrun.SingleWrite) {
-                    // Note: use a thread here to allow parallel readout and file writing
-                    if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {	
-                        ret = WriteOutputFilesx742(&WDcfg, &WDrun, &EventInfo, Event742); 
-                    }
-                    else if (WDcfg.Nbit == 8) {
-                        ret = WriteOutputFiles(&WDcfg, &WDrun, &EventInfo, Event8);
-                    }
-                    else {
-                        ret = WriteOutputFiles(&WDcfg, &WDrun, &EventInfo, Event16);
-                    }
-                    if (ret) {
-                        ErrCode = ERR_OUTFILE_WRITE;
-                        goto QuitProgram;
-                    }
-                    if (WDrun.SingleWrite) {
-                        printf("Single Event saved to output files\n");
-                        WDrun.SingleWrite = 0;
-                    }
-                }
-
-                /* Plot Waveforms */
-                if ((WDrun.ContinuousPlot || WDrun.SinglePlot) && !IsPlotterBusy()) {
-                    int Ntraces = (BoardInfo.FamilyCode == CAEN_DGTZ_XX740_FAMILY_CODE) ? 8 : WDcfg.Nch;
-                    if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) Ntraces = 9;
-                    if (PlotVar == NULL) {
-                        int TraceLength = max(WDcfg.RecordLength, (uint32_t)(1 << WDcfg.Nbit));
-                        PlotVar = OpenPlotter(WDcfg.GnuPlotPath, Ntraces, TraceLength);
-                        WDrun.SetPlotOptions = 1;
-                    }
-                    if (PlotVar == NULL) {
-                        printf("Can't open the plotter\n");
-                        WDrun.ContinuousPlot = 0;
-                        WDrun.SinglePlot = 0;
-                    } else {
-                        int Tn = 0;
-                        if (WDrun.SetPlotOptions) {
-                            if ((WDrun.PlotType == PLOT_WAVEFORMS) && (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE)) {
-                                strcpy(PlotVar->Title, "Waveform");
-                                PlotVar->Xscale = WDcfg.Ts;
-                                strcpy(PlotVar->Xlabel, "ns");
-                                strcpy(PlotVar->Ylabel, "ADC counts");
-                                PlotVar->Yautoscale = 0;
-                                PlotVar->Ymin = 0;
-                                PlotVar->Ymax = (float)(1<<WDcfg.Nbit);
-                                PlotVar->Xautoscale = 1;
-                            } else if (WDrun.PlotType == PLOT_WAVEFORMS) {
-                                strcpy(PlotVar->Title, "Waveform");
-                                PlotVar->Xscale = WDcfg.Ts * WDcfg.DecimationFactor/1000;
-                                strcpy(PlotVar->Xlabel, "us");
-                                strcpy(PlotVar->Ylabel, "ADC counts");
-                                PlotVar->Yautoscale = 0;
-                                PlotVar->Ymin = 0;
-                                PlotVar->Ymax = (float)(1<<WDcfg.Nbit);
-                                PlotVar->Xautoscale = 1;
-                            }  else if (WDrun.PlotType == PLOT_FFT) {
-                                strcpy(PlotVar->Title, "FFT");
-                                strcpy(PlotVar->Xlabel, "MHz");
-                                strcpy(PlotVar->Ylabel, "dB");
-                                PlotVar->Yautoscale = 1;
-                                PlotVar->Ymin = -160;
-                                PlotVar->Ymax = 0;
-                                PlotVar->Xautoscale = 1;
-                            } else if (WDrun.PlotType == PLOT_HISTOGRAM) {
-                                PlotVar->Xscale = 1.0;
-								strcpy(PlotVar->Title, "Histogram");
-                                strcpy(PlotVar->Xlabel, "ADC channels");
-                                strcpy(PlotVar->Ylabel, "Counts");
-                                PlotVar->Yautoscale = 1;
-                                PlotVar->Xautoscale = 1;
-                            }
-                            SetPlotOptions();
-                            WDrun.SetPlotOptions = 0;
-                        }
-                        for(ch=0; ch<Ntraces; ch++) {
-                            int absCh = WDrun.GroupPlotIndex * 8 + ch;
-
-                            if (!((WDrun.ChannelPlotMask >> ch) & 1))
-                                continue;
-                            if ((BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) && ((ch != 0) && (absCh % 8) == 0)) sprintf(PlotVar->TraceName[Tn], "TR %d", (int)((absCh-1) / 16));
-                            else sprintf(PlotVar->TraceName[Tn], "CH %d", absCh);
-                            if (WDrun.PlotType == PLOT_WAVEFORMS) {
-                                if (WDcfg.Nbit == 8) {
-                                    PlotVar->TraceSize[Tn] = Event8->ChSize[absCh];
-                                    memcpy(PlotVar->TraceData[Tn], Event8->DataChannel[absCh], Event8->ChSize[absCh]);
-                                    PlotVar->DataType = PLOT_DATA_UINT8;
-                                } else if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {
-                                    if (Event742->GrPresent[WDrun.GroupPlotIndex]) { 
-                                        PlotVar->TraceSize[Tn] = Event742->DataGroup[WDrun.GroupPlotIndex].ChSize[ch];
-                                        memcpy(PlotVar->TraceData[Tn], Event742->DataGroup[WDrun.GroupPlotIndex].DataChannel[ch], Event742->DataGroup[WDrun.GroupPlotIndex].ChSize[ch] * sizeof(float));
-                                        PlotVar->DataType = PLOT_DATA_FLOAT;
-                                    }
-                                }
-                                else {
-                                    PlotVar->TraceSize[Tn] = Event16->ChSize[absCh];
-                                    memcpy(PlotVar->TraceData[Tn], Event16->DataChannel[absCh], Event16->ChSize[absCh] * 2);
-                                    PlotVar->DataType = PLOT_DATA_UINT16;
-                                }  
-                            } else if (WDrun.PlotType == PLOT_FFT) {
-                                int FFTns;
-                                PlotVar->DataType = PLOT_DATA_DOUBLE;
-                                if(WDcfg.Nbit == 8)
-                                    FFTns = FFT(Event8->DataChannel[absCh], PlotVar->TraceData[Tn], Event8->ChSize[absCh], HANNING_FFT_WINDOW, SAMPLETYPE_UINT8);
-                                else if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {
-                                    FFTns = FFT(Event742->DataGroup[WDrun.GroupPlotIndex].DataChannel[ch], PlotVar->TraceData[Tn],
-                                        Event742->DataGroup[WDrun.GroupPlotIndex].ChSize[ch], HANNING_FFT_WINDOW, SAMPLETYPE_FLOAT);
-                                }
-                                else
-                                    FFTns = FFT(Event16->DataChannel[absCh], PlotVar->TraceData[Tn], Event16->ChSize[absCh], HANNING_FFT_WINDOW, SAMPLETYPE_UINT16);
-                                PlotVar->Xscale = (1000/WDcfg.Ts)/(2*FFTns);
-                                PlotVar->TraceSize[Tn] = FFTns;
-                            } else if (WDrun.PlotType == PLOT_HISTOGRAM) {
-                                PlotVar->DataType = PLOT_DATA_UINT32;
-                                strcpy(PlotVar->Title, "Histogram");
-                                PlotVar->TraceSize[Tn] = 1<<WDcfg.Nbit;
-                                memcpy(PlotVar->TraceData[Tn], WDrun.Histogram[absCh], (uint64_t)(1<<WDcfg.Nbit) * sizeof(uint32_t));
-                            }
-                            Tn++;
-                            if (Tn >= MAX_NUM_TRACES)
-                                break;
-                        }
-                        PlotVar->NumTraces = Tn;
-                        if( PlotWaveforms() < 0) {
-                            WDrun.ContinuousPlot = 0;
-                            printf("Plot Error\n");
-                        }
-                        WDrun.SinglePlot = 0;
-                    }
-                }
-        }
-    }
-    ErrCode = ERR_NONE;
-
-QuitProgram:
-    if (ErrCode) {
-        printf("\a%s\n", ErrMsg[ErrCode]);
-#ifdef WIN32
-        printf("Press a key to quit\n");
-        getch();
-#endif
-    }
-
-    /* stop the acquisition */
-    CAEN_DGTZ_SWStopAcquisition(handle);
-
-    /* close the plotter */
-    if (PlotVar)
-        ClosePlotter();
-
-    /* close the output files and free histograms*/
-    for (ch = 0; ch < WDcfg.Nch; ch++) {
-        if (WDrun.fout[ch])
-            fclose(WDrun.fout[ch]);
-        if (WDrun.Histogram[ch])
-            free(WDrun.Histogram[ch]);
-    }
-
-    /* close the device and free the buffers */
-    if(Event8)
-        CAEN_DGTZ_FreeEvent(handle, (void**)&Event8);
-    if(Event16)
-        CAEN_DGTZ_FreeEvent(handle, (void**)&Event16);
-    CAEN_DGTZ_FreeReadoutBuffer(&buffer);
-    CAEN_DGTZ_CloseDigitizer(handle);
+    QuitProgram:
 
     return 0;
 }
