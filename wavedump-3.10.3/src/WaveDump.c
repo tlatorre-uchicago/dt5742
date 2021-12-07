@@ -1755,10 +1755,10 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
                     wdata[j*nsamples + k] = data[j][i][k];
 
             /* Create the compressed unlimited dataset. */
-            dset = H5Dcreate(file, dset_name, H5T_IEEE_F32BE, space, H5P_DEFAULT, dcpl, H5P_DEFAULT);
+            dset = H5Dcreate(file, dset_name, H5T_NATIVE_FLOAT, space, H5P_DEFAULT, dcpl, H5P_DEFAULT);
 
             /* Write the data to the dataset. */
-            status = H5Dwrite(dset, H5T_IEEE_F32BE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
+            status = H5Dwrite(dset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
 
             free(wdata);
 
@@ -1778,14 +1778,15 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
             fprintf(stderr, "error closing hdf5 file.\n");
             return 1;
         }
-    }
 
+        return 0;
+    }
 
     /* Open file and dataset using the default properties. */
     file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     for (i = 0; i < 32; i++) {
         sprintf(dset_name, "ch%i", i);
-        dset = H5Dopen (file, dset_name, H5P_DEFAULT);
+        dset = H5Dopen(file, dset_name, H5P_DEFAULT);
 
         /* Get dataspace and allocate memory for read buffer.  This is a
          * two dimensional dataset so the dynamic allocation must be done
@@ -1793,11 +1794,21 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         space = H5Dget_space(dset);
         ndims = H5Sget_simple_extent_dims(space, dims, NULL);
 
+        printf("dims[0] = %i\n", dims[0]);
+        printf("dims[1] = %i\n", dims[1]);
+
         extdims[0] = n;
         extdims[1] = nsamples;
 
+        /* Memory dataspace resized. */
+        printf("extending memory dataspace.\n");
+        H5Sset_extent_simple(space, ndims, extdims, NULL);
+
+        dims[0] += extdims[0];
+
         /* Extend the dataset. */
-        status = H5Dset_extent(dset, extdims);
+        printf("extending the dataset.\n");
+        status = H5Dset_extent(dset, dims);
 
         if (status) {
             fprintf(stderr, "error extending dataset.\n");
@@ -1807,22 +1818,27 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         /* Retrieve the dataspace for the newly extended dataset. */
         space = H5Dget_space(dset);
 
-        /* Select the entire dataspace. */
-        status = H5Sselect_all(space);
+        ///* Select the entire dataspace. */
+        //status = H5Sselect_all(space);
 
-        if (status) {
-            fprintf(stderr, "error selecting dataspace.\n");
-            return 1;
-        }
+        //if (status) {
+        //    fprintf(stderr, "error selecting dataspace.\n");
+        //    return 1;
+        //}
 
         /* Subtract a hyperslab reflecting the original dimensions from the
          * selection.  The selection now contains only the newly extended
          * portions of the dataset. */
-        start[0] = 0;
+        start[0] = dims[0]-extdims[0];
         start[1] = 0;
-        count[0] = dims[0];
+        count[0] = extdims[0];
         count[1] = dims[1];
-        status = H5Sselect_hyperslab(space, H5S_SELECT_NOTB, start, NULL, count, NULL);
+        status = H5Sselect_hyperslab(space, H5S_SELECT_SET, start, NULL, count, NULL);
+
+        if (status) {
+            fprintf(stderr, "error selecting hyperslab.\n");
+            return 1;
+        }
 
         float *wdata = malloc(n*nsamples*sizeof(float));
 
@@ -1831,7 +1847,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
                 wdata[j*nsamples + k] = data[j][i][k];
 
         /* Write the data to the selected portion of the dataset. */
-        status = H5Dwrite (dset, H5T_NATIVE_INT, H5S_ALL, space, H5P_DEFAULT, wdata);
+        status = H5Dwrite(dset, H5T_NATIVE_FLOAT, H5S_ALL, space, H5P_DEFAULT, wdata);
 
         /* Close and release resources. */
         free(wdata);
@@ -2284,14 +2300,13 @@ Restart:
 
                     chmask |= 1 << (gr*8 + ch);
                     char filename[256];
-                    printf("size = %i\n", Size);
                     sprintf(filename, "channel_%i_%i.txt", gr*8 + ch, i);
-                    FILE *f = fopen(filename, "w");
+                    //FILE *f = fopen(filename, "w");
                     for(int j = 0; j < Size; j++) {
-                        fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
+                        //fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
                         wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                     }
-                    fclose(f);
+                    //fclose(f);
                 }
             }
         }
@@ -2362,11 +2377,12 @@ Restart:
 
     CAEN_DGTZ_SWStartAcquisition(handle);
 
-    for (i = 0; i < 10; i++) {
+    while (1) {
         /* Read data from the board */
-        ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
+        printf("sending sw trigger\n");
+	CAEN_DGTZ_SendSWtrigger(handle);
 
-        CAEN_DGTZ_SWStopAcquisition(handle);
+        ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
 
         if (ret) {
             ErrCode = ERR_READOUT;
@@ -2435,6 +2451,8 @@ Restart:
         if (NumEvents > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
             goto QuitProgram;
         }
+
+        //if (NumEvents > 0) goto QuitProgram;
 
         usleep(100000);
     }
