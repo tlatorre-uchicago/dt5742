@@ -1690,16 +1690,15 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
 
 int add_to_output_file(char *filename, float data[1000][32][1024], int n, int chmask, int nsamples)
 {
-    hid_t file, space, dset, dcpl;    /* Handles */
-    herr_t          status;
-    htri_t          avail;
+    hid_t file, space, dset, dcpl, mem_space, file_space;
+    herr_t status;
+    htri_t avail;
     int ndims;
     hsize_t dims[2], chunk[2], extdims[2], maxdims[2];
     char dset_name[256];
     hsize_t start[2], count[2];
     int i, j, k;
-    unsigned int    flags,
-                    filter_info;
+    unsigned int flags, filter_info;
 
     chunk[0] = 100;
     chunk[1] = 1024;
@@ -1726,9 +1725,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
             return 1;
         }
 
-        /*
-         * Create a new file using the default properties.
-         */
+        /* Create a new file using the default properties. */
         file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
         for (i = 0; i < 32; i++) {
@@ -1782,32 +1779,35 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         return 0;
     }
 
-    /* Open file and dataset using the default properties. */
+    /* Extend the dataset.
+     *
+     * Note: This is really confusing. I couldn't have done this without the
+     * stack overflow answer here:
+     * https://stackoverflow.com/questions/15379399/writing-appending-arrays-of-float-to-the-only-dataset-in-hdf5-file-in-c. */
     file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     for (i = 0; i < 32; i++) {
+        if (!(chmask & (1 << i))) continue;
+
         sprintf(dset_name, "ch%i", i);
-        dset = H5Dopen(file, dset_name, H5P_DEFAULT);
+        if ((dset = H5Dopen(file, dset_name, H5P_DEFAULT)) < 0) {
+            fprintf(stderr, "couldn't find dataset for %s. skipping...\n", dset_name);
+        }
 
-        /* Get dataspace and allocate memory for read buffer.  This is a
-         * two dimensional dataset so the dynamic allocation must be done
-         * in steps. */
-        space = H5Dget_space(dset);
-        ndims = H5Sget_simple_extent_dims(space, dims, NULL);
-
-        printf("dims[0] = %i\n", dims[0]);
-        printf("dims[1] = %i\n", dims[1]);
+        /* Get dataspace and allocate memory for read buffer. This is a two
+         * dimensional dataset so the dynamic allocation must be done in steps. */
+        file_space = H5Dget_space(dset);
+        ndims = H5Sget_simple_extent_dims(file_space, dims, NULL);
 
         extdims[0] = n;
         extdims[1] = nsamples;
 
         /* Memory dataspace resized. */
-        printf("extending memory dataspace.\n");
-        H5Sset_extent_simple(space, ndims, extdims, NULL);
+        mem_space = H5Screate_simple(ndims, extdims, NULL);
 
+        /* Update dims so it now has the new size. */
         dims[0] += extdims[0];
 
         /* Extend the dataset. */
-        printf("extending the dataset.\n");
         status = H5Dset_extent(dset, dims);
 
         if (status) {
@@ -1816,24 +1816,16 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         }
 
         /* Retrieve the dataspace for the newly extended dataset. */
-        space = H5Dget_space(dset);
-
-        ///* Select the entire dataspace. */
-        //status = H5Sselect_all(space);
-
-        //if (status) {
-        //    fprintf(stderr, "error selecting dataspace.\n");
-        //    return 1;
-        //}
+        file_space = H5Dget_space(dset);
 
         /* Subtract a hyperslab reflecting the original dimensions from the
-         * selection.  The selection now contains only the newly extended
+         * selection. The selection now contains only the newly extended
          * portions of the dataset. */
         start[0] = dims[0]-extdims[0];
         start[1] = 0;
         count[0] = extdims[0];
-        count[1] = dims[1];
-        status = H5Sselect_hyperslab(space, H5S_SELECT_SET, start, NULL, count, NULL);
+        count[1] = extdims[1];
+        status = H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start, NULL, count, NULL);
 
         if (status) {
             fprintf(stderr, "error selecting hyperslab.\n");
@@ -1847,12 +1839,18 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
                 wdata[j*nsamples + k] = data[j][i][k];
 
         /* Write the data to the selected portion of the dataset. */
-        status = H5Dwrite(dset, H5T_NATIVE_FLOAT, H5S_ALL, space, H5P_DEFAULT, wdata);
+        status = H5Dwrite(dset, H5T_NATIVE_FLOAT, mem_space, file_space, H5P_DEFAULT, wdata);
+
+        if (status) {
+            fprintf(stderr, "error writing to hdf5 file.\n");
+            return 1;
+        }
 
         /* Close and release resources. */
         free(wdata);
+        status = H5Sclose(mem_space);
         status = H5Dclose(dset);
-        status = H5Sclose(space);
+        status = H5Sclose(file_space);
 
         if (status) {
             fprintf(stderr, "error closing hdf5 resources.\n");
@@ -1944,9 +1942,7 @@ int main(int argc, char *argv[])
     ParseConfigFile(f_ini, &WDcfg);
     fclose(f_ini);
 
-    /* *************************************************************************************** */
-    /* Open the digitizer and read the board information                                       */
-    /* *************************************************************************************** */
+    /* Open the digitizer and read the board information */
     isVMEDevice = WDcfg.BaseAddress ? 1 : 0;
 
     ret = CAEN_DGTZ_OpenDigitizer2(WDcfg.LinkType, (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum), WDcfg.ConetNode, WDcfg.BaseAddress, &handle);
@@ -1965,7 +1961,7 @@ int main(int argc, char *argv[])
     printf("ROC FPGA Release is %s\n", BoardInfo.ROC_FirmwareRel);
     printf("AMC FPGA Release is %s\n", BoardInfo.AMC_FirmwareRel);
 
-    // Check firmware rivision (DPP firmwares cannot be used with WaveDump */
+    /* Check firmware rivision (DPP firmwares cannot be used with WaveDump) */
     sscanf(BoardInfo.AMC_FirmwareRel, "%d", &MajorNumber);
     if (MajorNumber >= 128) {
         printf("This digitizer has a DPP firmware\n");
@@ -1973,49 +1969,7 @@ int main(int argc, char *argv[])
         goto QuitProgram;
     }
 
-	/* *************************************************************************************** */
-	/* Check if the board needs a specific config file and parse it instead of the default one */
-	/* *************************************************************************************** */
-
-	if (argc <= 1){//detect if connected board needs a specific configuration file, only if the user did not specify his configuration file
-		int use_specific_file = 0;
-		//Check if model x742 is in use --> use its specific configuration file
-		if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {
-		
-#ifdef LINUX 
-			strcpy(ConfigFileName, "/etc/wavedump/WaveDumpConfig_X742.txt");
-#else
-			strcpy(ConfigFileName, "WaveDumpConfig_X742.txt");			
-#endif
-			printf("\nWARNING: using configuration file %s specific for Board model X742.\nEdit this file if you want to modify the default settings.\n ", ConfigFileName);
-			use_specific_file = 1;
-		}//Check if model x740 is in use --> use its specific configuration file
-		else if (BoardInfo.FamilyCode == CAEN_DGTZ_XX740_FAMILY_CODE) {
-
-#ifdef LINUX 
-			strcpy(ConfigFileName, "/etc/wavedump/WaveDumpConfig_X740.txt");
-#else
-			strcpy(ConfigFileName, "WaveDumpConfig_X740.txt");
-#endif		
-			printf("\nWARNING: using configuration file %s specific for Board model X740.\nEdit this file if you want to modify the default settings.\n ", ConfigFileName);
-			use_specific_file = 1;
-		}
-
-		if (use_specific_file) {
-			memset(&WDrun, 0, sizeof(WDrun));
-			memset(&WDcfg, 0, sizeof(WDcfg));
-
-			f_ini = fopen(ConfigFileName, "r");
-			if (f_ini == NULL) {
-				ErrCode = ERR_CONF_FILE_NOT_FOUND;
-				goto QuitProgram;
-			}
-			ParseConfigFile(f_ini, &WDcfg);
-			fclose(f_ini);
-		}
-	}
-
-    // Get Number of Channels, Number of bits, Number of Groups of the board */
+    /* Get Number of Channels, Number of bits, Number of Groups of the board */
     ret = GetMoreBoardInfo(handle, BoardInfo, &WDcfg);
     if (ret) {
         ErrCode = ERR_INVALID_BOARD_TYPE;
@@ -2023,21 +1977,21 @@ int main(int argc, char *argv[])
     }
 
 
-	//Check for possible board internal errors
-	ret = CheckBoardFailureStatus(handle, BoardInfo);
-	if (ret) {
-		ErrCode = ERR_BOARD_FAILURE;
-		goto QuitProgram;
-	}
+    //Check for possible board internal errors
+    ret = CheckBoardFailureStatus(handle, BoardInfo);
+    if (ret) {
+            ErrCode = ERR_BOARD_FAILURE;
+            goto QuitProgram;
+    }
 
-	//set default DAC calibration coefficients
-	for (i = 0; i < MAX_SET; i++) {
-		WDcfg.DAC_Calib.cal[i] = 1;
-		WDcfg.DAC_Calib.offset[i] = 0;
-	}
-	//load DAC calibration data (if present in flash)
-	if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
-		Load_DAC_Calibration_From_Flash(handle, &WDcfg, BoardInfo);
+    //set default DAC calibration coefficients
+    for (i = 0; i < MAX_SET; i++) {
+            WDcfg.DAC_Calib.cal[i] = 1;
+            WDcfg.DAC_Calib.offset[i] = 0;
+    }
+    //load DAC calibration data (if present in flash)
+    if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
+            Load_DAC_Calibration_From_Flash(handle, &WDcfg, BoardInfo);
 
     // Perform calibration (if needed).
     if (WDcfg.StartupCalibration)
@@ -2062,28 +2016,26 @@ Restart:
     } else {
         WDrun.ChannelPlotMask = (WDcfg.FastTriggerEnabled == 0) ? 0xFF: 0x1FF;
     }
-	if ((BoardInfo.FamilyCode == CAEN_DGTZ_XX730_FAMILY_CODE) || (BoardInfo.FamilyCode == CAEN_DGTZ_XX725_FAMILY_CODE)) {
-		WDrun.GroupPlotSwitch = 0;
-	}
-    /* *************************************************************************************** */
-    /* program the digitizer                                                                   */
-    /* *************************************************************************************** */
+
+    if ((BoardInfo.FamilyCode == CAEN_DGTZ_XX730_FAMILY_CODE) || (BoardInfo.FamilyCode == CAEN_DGTZ_XX725_FAMILY_CODE)) {
+            WDrun.GroupPlotSwitch = 0;
+    }
+
+    /* program the digitizer */
     ret = ProgramDigitizer(handle, WDcfg, BoardInfo);
     if (ret) {
         ErrCode = ERR_DGZ_PROGRAM;
         goto QuitProgram;
     }
-#ifdef _WIN32
-	Sleep(300);
-#else
-	usleep(300000);
-#endif
-	//check for possible failures after programming the digitizer
-	ret = CheckBoardFailureStatus(handle, BoardInfo);
-	if (ret) {
-		ErrCode = ERR_BOARD_FAILURE;
-		goto QuitProgram;
-	}
+
+    usleep(300000);
+
+    //check for possible failures after programming the digitizer
+    ret = CheckBoardFailureStatus(handle, BoardInfo);
+    if (ret) {
+            ErrCode = ERR_BOARD_FAILURE;
+            goto QuitProgram;
+    }
 
     // Select the next enabled group for plotting
     if ((WDcfg.EnableMask) && (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE || BoardInfo.FamilyCode == CAEN_DGTZ_XX740_FAMILY_CODE))
