@@ -1897,6 +1897,7 @@ int main(int argc, char *argv[])
     char *config_filename = NULL;
     char *output_filename = NULL;
     int nevents = 100;
+    int total_events = 0;
 
     CAEN_DGTZ_UINT16_EVENT_t    *Event16=NULL; /* generic event struct with 16 bit data (10, 12, 14 and 16 bit digitizers */
 
@@ -2230,16 +2231,6 @@ Restart:
             goto QuitProgram;
         }
 
-        if (WDcfg.useCorrections != -1) { // if manual corrections
-            uint32_t gr;
-            for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
-                if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
-                    continue;
-                printf("applying corrections\n");
-                ApplyDataCorrection( &(X742Tables[gr]), WDcfg.DRS4Frequency, WDcfg.useCorrections, &(Event742->DataGroup[gr]));
-            }
-        }
-
         for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
             if (Event742->GrPresent[gr]) {
                 for (ch = 0; ch < 8; ch++) {
@@ -2251,14 +2242,9 @@ Restart:
                     nsamples = Size;
 
                     chmask |= 1 << (gr*8 + ch);
-                    char filename[256];
-                    sprintf(filename, "channel_%i_%i.txt", gr*8 + ch, i);
-                    //FILE *f = fopen(filename, "w");
                     for(int j = 0; j < Size; j++) {
-                        //fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
                         wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                     }
-                    //fclose(f);
                 }
             }
         }
@@ -2329,7 +2315,7 @@ Restart:
 
     CAEN_DGTZ_SWStartAcquisition(handle);
 
-    while (1) {
+    while (total_events < nevents) {
         /* Read data from the board */
         printf("sending sw trigger\n");
 	CAEN_DGTZ_SendSWtrigger(handle);
@@ -2368,14 +2354,6 @@ Restart:
                 goto QuitProgram;
             }
 
-            if (WDcfg.useCorrections != -1) { // if manual corrections
-                uint32_t gr;
-                for (gr = 0; gr < WDcfg.MaxGroupNumber; gr++) {
-                    if (((WDcfg.EnableMask >> gr) & 0x1) == 0)
-                        continue;
-                }
-            }
-
             for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
                 if (Event742->GrPresent[gr]) {
                     for (ch = 0; ch < 8; ch++) {
@@ -2404,7 +2382,7 @@ Restart:
             goto QuitProgram;
         }
 
-        //if (NumEvents > 0) goto QuitProgram;
+        total_events += NumEvents;
 
         usleep(100000);
     }
