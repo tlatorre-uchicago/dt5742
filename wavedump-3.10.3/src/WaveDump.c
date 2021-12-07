@@ -1669,6 +1669,9 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
 {
     int i, j, k;
 
+    for (j = 0; j < 32; j++)
+        baselines[j] = 0;
+
     for (i = 0; i < n; i++) {
         for (j = 0; j < 32; j++) {
             if (!(chmask & (1 << j))) {
@@ -1676,7 +1679,6 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
                 continue;
             }
 
-            baselines[j] = 0;
             for (k = 0; k < nsamples; k++) {
                 baselines[j] += data[i][j][k];
             }
@@ -1898,6 +1900,7 @@ int main(int argc, char *argv[])
     char *output_filename = NULL;
     int nevents = 100;
     int total_events = 0;
+    int chunk = 10;
 
     CAEN_DGTZ_UINT16_EVENT_t    *Event16=NULL; /* generic event struct with 16 bit data (10, 12, 14 and 16 bit digitizers */
 
@@ -1919,6 +1922,8 @@ int main(int argc, char *argv[])
             nevents = atoi(argv[++i]);
         } else if (!strcmp(argv[i],"-o") && i < argc - 1) {
             output_filename = argv[++i];
+        } else if (!strcmp(argv[i],"-c") && i < argc - 1) {
+            chunk = atoi(argv[++i]);
         } else if (!strcmp(argv[i],"-h")) {
             print_help();
         } else {
@@ -2117,19 +2122,15 @@ Restart:
         goto QuitProgram;
     }
 
-	if (WDrun.Restart && WDrun.AcqRun) 
-	{
-#ifdef _WIN32
-		Sleep(300);
-#else
-		usleep(300000);
-#endif
-		if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
-			Set_relative_Threshold(handle, &WDcfg, BoardInfo);
+    if (WDrun.Restart && WDrun.AcqRun) 
+    {
+        usleep(300000);
 
-		CAEN_DGTZ_SWStartAcquisition(handle);
-	}
-    else
+        if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
+            Set_relative_Threshold(handle, &WDcfg, BoardInfo);
+
+        CAEN_DGTZ_SWStartAcquisition(handle);
+    } else
         printf("[s] start/stop the acquisition, [q] quit, [SPACE] help\n");
     WDrun.Restart = 0;
     PrevRateTime = get_time();
@@ -2156,18 +2157,6 @@ Restart:
         goto QuitProgram;
     }
 
-    //printf("setting interrupt config\n");
-    //ret = CAEN_DGTZ_SetInterruptConfig(handle, CAEN_DGTZ_ENABLE, VME_INTERRUPT_LEVEL, VME_INTERRUPT_STATUS_ID, 10, INTERRUPT_MODE);
-
-    //if (ret) {
-    //    fprintf(stderr, "Error configuring interrupts!\n");
-    //    goto QuitProgram;
-    //}
-    //
-    //ret |= CAEN_DGTZ_SetMaxNumEventsBLT(handle, 1000);
-    //ret |= CAEN_DGTZ_SetAcquisitionMode(handle, CAEN_DGTZ_SW_CONTROLLED);
-    //ret |= CAEN_DGTZ_SetExtTriggerInputMode(handle, WDcfg.ExtTriggerMode);
-
     printf("starting acquisition\n");
     CAEN_DGTZ_SWStartAcquisition(handle);
 
@@ -2175,16 +2164,6 @@ Restart:
         printf("sending sw trigger\n");
         CAEN_DGTZ_SendSWtrigger(handle);
         usleep(1000);
-
-        //ret = CAEN_DGTZ_IRQWait(handle, INTERRUPT_TIMEOUT);
-
-        //if (ret == CAEN_DGTZ_Timeout) {
-        //    printf("timeout\n");
-        //    continue;
-        //} else if (ret != CAEN_DGTZ_Success)  {
-        //    ErrCode = ERR_INTERRUPT;
-        //    goto QuitProgram;
-        //}
     }
 
     /* Read data from the board */
@@ -2252,6 +2231,9 @@ Restart:
 
     get_baselines(wfdata, baselines, NumEvents, chmask, nsamples);
 
+    for (i = 0; i < 32; i++)
+        printf("baselines[%i] = %f\n", i, baselines[i]);
+
     for (i = 0; i < 2; i++)
         thresholds[i] = 1e99;
 
@@ -2315,6 +2297,8 @@ Restart:
 
     CAEN_DGTZ_SWStartAcquisition(handle);
 
+    int nread = 0;
+
     while (total_events < nevents) {
         /* Read data from the board */
         printf("sending sw trigger\n");
@@ -2365,24 +2349,27 @@ Restart:
                         nsamples = Size;
 
                         chmask |= 1 << (gr*8 + ch);
-                        char filename[256];
-                        sprintf(filename, "channel_%i_%i.txt", gr*8 + ch, i);
-                        FILE *f = fopen(filename, "w");
                         for(int j = 0; j < Size; j++) {
-                            fprintf(f, "%f\n", Event742->DataGroup[gr].DataChannel[ch][j]);
-                            wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                            wfdata[nread+i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                         }
-                        fclose(f);
                     }
                 }
             }
+            nread += 1;
+
+            if (nread >= chunk) {
+                printf("writing %i events to file\n", nread);
+                if (add_to_output_file(output_filename, wfdata, nread, chmask, nsamples)) {
+                    goto QuitProgram;
+                }
+                nread = 0;
+                total_events += nread;
+            }
         }
 
-        if (NumEvents > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
+        if (nread > 0 && add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples)) {
             goto QuitProgram;
         }
-
-        total_events += NumEvents;
 
         usleep(100000);
     }
