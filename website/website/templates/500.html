@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}Internal Server Error{% endblock %}
+{% block body %}
+    {{ super() }}
+    <div class="container">
+        <h1>500 Internal Server Error</h1>
+        <p>There was an internal error on minard. You can report issues on the github page here <a href="https://github.com/snoplus/minard/issues">https://github.com/snoplus/minard/issues</a>.
+    </div>
+{% endblock %}

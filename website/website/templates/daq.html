@@ -1,0 +1,247 @@
+{% extends "layout.html" %}
+{% block title %}Channels{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style>
+        .carousel-control.right, .carousel-control.left {
+            background-image: none;
+        }
+
+        .axis path {
+            display: none;
+        }
+
+        .horizon .title,
+        .horizon .value {
+            line-height: 20px;
+        }
+
+        .slide-container {
+            width: 90%;
+        }
+
+        .carousel-control.right, .carousel-control.left {
+            width: 5%;
+        }
+    </style>
+{% endblock %}
+{% block body %}
+    {{ super() }}
+    <div class="container">
+    <div id="carousel" class="carousel slide" data-ride="carousel"
+     data-interval="">
+        <div class="carousel-inner">
+            <div class="item active">
+                <!-- first slide -->
+                <a class="left carousel-control" href="#carousel" role="button" data-slide="prev">
+                    <span class="glyphicon glyphicon-chevron-left"></span>
+                </a>
+                <a class="right carousel-control" href="#carousel" role="button" data-slide="next">
+                    <span class="glyphicon glyphicon-chevron-right"></span>
+                </a>
+                <div class="container slide-container">
+                    <div class="row">
+                        <center>
+                            <div id="crate"></div>
+                        </center>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div id="timeseries" style="position:relative"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="panel panel-default">
+                                <div class="panel-heading">
+                                    Options <a href="#" data-toggle="modal" data-target="#modal"><span class="glyphicon glyphicon-question-sign"></span></a>
+                                </div>
+                                <div class="panel-body">
+                                    <form class="form-horizontal" role="form">
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Data
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <select id="data-source"
+                                                 class="form-control">
+                                                    <option value="cmos">CMOS</option>
+                                                    <option value="base">Base</option>
+                                                    <option value="occupancy">
+                                                        Occupancy
+                                                    </option>
+                                                </select>
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Colors
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <select id="colors"
+                                                 class="form-control">
+                                                </select>
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Threshold (LO)
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <input id="threshold-lo"
+                                                 type="number"
+                                                 class="form-control">
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Threshold (HI)
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <input id="threshold-hi"
+                                                 type="number"
+                                                 class="form-control">
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Method
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <select id="data-method"
+                                                 class="form-control">
+                                                    <option value="avg">Average</option>
+                                                    <option value="max">Max</option>
+                                                </select>
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Time Series Step
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <select id="data-step"
+                                                 class="form-control">
+                                                    <option value="5">5 seconds</option>
+                                                    <option value="60">1 minute</option>
+                                                    <option value="86400">1 day</option>
+                                                </select>
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                        <div class="form-group form-group-sm">
+                                            <label class="col-sm-4 control-label">
+                                                Crate Map Window
+                                            </label>
+                                            <div class="col-sm-8">
+                                                <select id="crate-map-window"
+                                                 class="form-control">
+                                                    <option value="5">5 seconds</option>
+                                                    <option value="60">1 minute</option>
+                                                    <option value="86400">1 day</option>
+                                                </select>
+                                            </div> <!-- col-sm-10 -->
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div> <!-- row -->
+                </div>
+            </div>
+            <div class="item">
+                <!-- second slide -->
+                <a class="left carousel-control" href="#carousel" role="button" data-slide="prev">
+                    <span class="glyphicon glyphicon-chevron-left"></span>
+                </a>
+                <a class="right carousel-control" href="#carousel" role="button" data-slide="next">
+                    <span class="glyphicon glyphicon-chevron-right"></span>
+                </a>
+                <div class="container slide-container">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4><span id="card-heading"></span> <small><span class="data-source-heading"></span></small></h4>
+                            <div id="card"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="timeseries-card" style="position:relative"></div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- item -->
+            <div class="item">
+                <!-- third slide -->
+                <a class="left carousel-control" href="#carousel" role="button" data-slide="prev">
+                    <span class="glyphicon glyphicon-chevron-left"></span>
+                </a>
+                <a class="right carousel-control" href="#carousel" role="button" data-slide="next">
+                    <span class="glyphicon glyphicon-chevron-right"></span>
+                </a>
+                <div class="container slide-container">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h4><span id="channel-heading"></span> <small><span class="data-source-heading"></span></small></h4>
+                            <div id="timeseries-channel" style="position:relative"></div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- item -->
+        </div>
+    </div>
+    <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Options</h4>
+                </div>
+                <div class="modal-body">
+                    <dl>
+                        <dt>Method</dt>
+                        <dd><p>Method determines how time series for crates/cards are computed. For example,
+                        if method is "Average", the time series for a crate will be the average of all
+                        the CMOS rates for each channel in the crate/card. If method is "Maximum", then the
+                        time series will show the maximum CMOS rate for all channels in the crate/card.
+                        <div class="alert alert-success">
+                            <strong>Note:</strong> This option is <em>not</em> used to combine multiple data points within a single time
+                            bin. For example, if there were 10 CMOS readings within a single time bin
+                            for a given channel, these are always <em>averaged</em> to produce the CMOS
+                            rate for that time bin.
+                        </div>
+                        </dd>
+                        <dt>Time Series Step</dt>
+                        <dd><p>The time step for a single CSS pixel in the time series.</dd>
+                        <dt>Crate Map Window</dt>
+                        <dd><p>The integration length for data displayed in the crate/card map.
+                        <div class="alert alert-success">
+                            <strong>Note:</strong> For performance reasons, this is <em>not</em> a rolling integration window,
+                            and therefore there will be discontinuous jumps in the data when the window
+                            switches from one bin to the next.
+                        </div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}
+{% block script %}
+    <script src="{{ url_for('static', filename='js/d3.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cubism.v1.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/moment-timezone-with-data.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/crate.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/colorbrewer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tzscale.js') }}"></script>
+
+    <script>
+        for (var key in colorbrewer) {
+            var option = $("<option value='" + key + "'>" + key + "</option>");
+
+            if (key == 'YlOrRd')
+                option.prop('selected',true);
+
+            $("#colors").append(option);
+        }
+    </script>
+
+    <script src="{{ url_for('static', filename='js/stream_utilities.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/daq.js') }}"></script>
+{% endblock %}
