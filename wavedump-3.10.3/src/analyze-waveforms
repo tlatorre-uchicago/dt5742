@@ -75,16 +75,25 @@ if __name__ == '__main__':
     charge = {}
     for filename in args.filenames:
         with h5py.File(filename) as f:
-            x = np.linspace(0,f.attrs['record_length']*1e3/f[channel].attrs['drs4_frequency'],f.attrs['record_length'])
-            for channel in f:
-                y = f[channel]*2/0xfff
+            x = np.linspace(0,f.attrs['record_length']*1e3/f.attrs['drs4_frequency'],f.attrs['record_length'])
+            for i in range(16):
+                channel = 'ch%i' % i
+
+                if channel not in f:
+                    print("failed to find channel %i" % i)
+                    continue
+
+                y = f[channel][:]*2/0xfff
+
+                # Remove baseline
+                y -= np.median(y[:,:100],axis=-1)[:,np.newaxis]
 
                 a, b = get_window(x,y,left=20,right=400)
                 
                 charge[channel] = integrate(x,y, a, b)
                 
                 if args.plot:
-                    plt.figure()
+                    plt.subplot(4,4,i+1)
                     plt.plot(x,y[:100].T)
                     plt.xlabel("Time (ns)")
                     plt.ylabel("Voltage (V)")
@@ -92,8 +101,16 @@ if __name__ == '__main__':
                     plt.axvline(x[a])
                     plt.axvline(x[b])
 
+    if args.plot:
+        plt.figure()
+
     f = ROOT.TFile(args.output,"recreate")
-    for channel in charge:
+    for i in range(16):
+        channel = 'ch%i' % i
+
+        if channel not in charge:
+            continue
+
         bins = get_bins(charge[channel])
         h = ROOT.TH1D(channel,"Charge Integral for %s" % channel,len(bins),bins[0],bins[-1])
         for x in charge[channel]:
@@ -101,10 +118,10 @@ if __name__ == '__main__':
         h.GetXaxis().SetTitle("Charge (pC)")
         
         if args.plot:
-            plt.figure()
-            plt.hist(charge[channel],bins=bins,histtype='step',label=channel)
+            plt.subplot(4,4,i+1)
+            plt.hist(charge[channel],bins=bins,histtype='step')
             plt.xlabel("Charge (pC)")
-            plt.legend()
+            plt.title(channel)
 
         h.Write()
                     

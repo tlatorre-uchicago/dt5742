@@ -2075,7 +2075,7 @@ Restart:
 
                         chmask |= 1 << (gr*8 + ch);
                         for(int j = 0; j < Size; j++) {
-                            wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                            wfdata[nread][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                         }
                     }
                 }
@@ -2084,12 +2084,12 @@ Restart:
         }
 
         printf("writing %i events to file\n", nread);
-        if (NumEvents > 0) {
-            if (add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples, &WDcfg)) {
+        if (nread > 0) {
+            if (add_to_output_file(output_filename, wfdata, nread, chmask, nsamples, &WDcfg)) {
                 goto QuitProgram;
             }
         }
-        total_events += NumEvents;
+        total_events += nread;
 
         usleep(100000);
     }
