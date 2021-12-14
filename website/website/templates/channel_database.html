@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Channel Status{% endblock %}
+{% block title %}Module Status{% endblock %}
 {% block head %}
     {{ super() }}
 {% endblock %}
@@ -186,23 +186,17 @@
 		    <thead>
 			<tr>
                             <th>Last Updated</th>
-			    <th>Crate</th>
-			    <th>Card</th>
-			    <th>Channel</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Name</th>
+			    <th>Barcode</th>
+			    <th>Voltage</th>
+			    <th>Institution</th>
 			</tr>
 		    </thead>
 		    {% for row in results %}
-		    <tr onclick="window.document.location = '{{ "channel-status?crate=%i&slot=%i&channel=%i" % (row['crate'], row['slot'], row['channel']) }}';">
+		    <tr onclick="window.document.location = '{{ "module-status?barcode=%i" % row['barcode'] }}';">
                         <td>{{ row['timestamp'] | time_from_now }}</td>
-			<td>{{ row['crate'] }}</td>
-			<td>{{ row['slot'] }}</td>
-			<td>{{ row['channel'] }}</td>
-                        <td>{{ row['type'] | pmt_type_description }}</td>
-                        <td>{{ row | channel_status }}</td>
-                        <td>{{ row['name'] }}</td>
+			<td>{{ row['barcode'] }}</td>
+			<td>{{ row['voltage'] }}</td>
+			<td>{{ row['institution'] }}</td>
 		    </tr>
 		    {% endfor %}
 		</table>

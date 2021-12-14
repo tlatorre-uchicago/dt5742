@@ -17,5 +17,6 @@ setup(name='website',
                         'argparse',
                         'sqlalchemy',
                         'psycopg2',
-                        'alabaster']
+                        'alabaster',
+                        'pytz']
       )

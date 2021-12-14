@@ -35,7 +35,7 @@ class ReverseProxied(object):
 
 app = Flask(__name__)
 
-#app.config.from_envvar('MINARD_SETTINGS', silent=False)
+app.config.from_envvar('WEBSITE_SETTINGS', silent=False)
 
 # try to configure logging. It is extremely difficult to figure out what the
 # proper way to log exceptions from Flask when running under gunicorn is. I

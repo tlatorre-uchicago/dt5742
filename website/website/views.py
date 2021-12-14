@@ -10,36 +10,9 @@ from math import isnan
 import os
 import sys
 import random
-from .channeldb import ChannelStatusForm, upload_channel_status, get_channels, get_channel_status, get_channel_status_form, get_channel_history, get_pmt_info, get_nominal_settings, get_discriminator_threshold, get_all_thresholds, get_maxed_thresholds, get_gtvalid_lengths, get_pmt_types, pmt_type_description, get_fec_db_history
-
-def nocache(view):
-    """
-    Flask decorator to hopefully prevent Firefox from caching responses which
-    are made very often.
-
-    Example:
-
-        @app.route('/foo')
-        @nocache
-        def foo():
-            # do stuff
-            return jsonify(*bar)
-
-    Basic idea from https://gist.github.com/arusahni/9434953.
-
-    Required Headers to prevent major browsers from caching content from
-    https://stackoverflow.com/questions/49547.
-    """
-    @wraps(view)
-    def no_cache(*args, **kwargs):
-        response = make_response(view(*args, **kwargs))
-        response.headers['Last-modified'] = datetime.now()
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
-
-    return update_wrapper(no_cache, view)
+from .channeldb import get_modules
+from datetime import datetime
+import pytz
 
 @app.template_filter('timefmt')
 def timefmt(timestamp):
@@ -49,57 +22,12 @@ def timefmt(timestamp):
 def internal_error(exception):
     return render_template('500.html'), 500
 
-@app.route('/channel-database')
-def channel_database():
+@app.route('/module-database')
+def module_database():
     limit = request.args.get("limit", 100, type=int)
     sort_by = request.args.get("sort-by", "timestamp")
-    results = get_channels(request.args, limit, sort_by)
+    results = get_modules(request.args, limit, sort_by)
     return render_template('channel_database.html', results=results, limit=limit, sort_by=sort_by)
-
-@app.template_filter('channel_status')
-def filter_channel_status(row):
-    status = []
-    if row['pmt_removed']:
-        status.append("PMT Removed")
-    if row['pmt_reinstalled']:
-        status.append("PMT Reinstalled")
-    if row['low_occupancy']:
-        status.append("Low Occ.")
-    if row['zero_occupancy']:
-        status.append("Zero Occ.")
-    if row['screamer']:
-        status.append("Screamer")
-    if row['bad_discriminator']:
-        status.append("Bad Disc.")
-    if row['no_n100']:
-        status.append("No N100")
-    if row['no_n20']:
-        status.append("No N20")
-    if row['no_esum']:
-        status.append("No ESUM")
-    if row['cable_pulled']:
-        status.append("Cable pulled")
-    if row['bad_cable']:
-        status.append("Bad Cable")
-    if row['resistor_pulled']:
-        status.append("Resistor pulled")
-    if row['disable_n100']:
-        status.append("Disable N100")
-    if row['disable_n20']:
-        status.append("Disable N20")
-    if row['high_dropout']:
-        status.append("High Dropout")
-    if row['bad_base_current']:
-        status.append("Bad Base Current")
-    if row['bad_data']:
-        status.append("Bad Data")
-    if row['bad_calibration']:
-        status.append("Bad Calibration")
-
-    if len(status) == 0:
-        return "Perfect!"
-
-    return ", ".join(status)
 
 @app.template_filter('time_from_now')
 def time_from_now(dt):
@@ -109,7 +37,9 @@ def time_from_now(dt):
 
     See https://momentjs.com/docs/#/displaying/fromnow/
     """
-    delta = total_seconds(datetime.now() - dt)
+    print(datetime.now())
+    print(dt)
+    delta = total_seconds(datetime.now(pytz.timezone('US/Pacific')) - dt)
 
     if delta < 45:
         return "a few seconds ago"
@@ -153,4 +83,4 @@ def channel_status():
 
 @app.route('/')
 def index():
-    return redirect(url_for('channel-database'))
+    return redirect(url_for('channel_database'))
