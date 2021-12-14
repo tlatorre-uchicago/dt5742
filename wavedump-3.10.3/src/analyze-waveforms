@@ -65,6 +65,10 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     import ROOT
     import matplotlib.pyplot as plt
+    import psycopg2
+    import psycopg2.extensions
+    import os
+    import sys
 
     parser = ArgumentParser(description='Analyze data from the Agilent scope')
     parser.add_argument('filenames',nargs='+',help='input filenames (hdf5 format)')
@@ -104,6 +108,8 @@ if __name__ == '__main__':
     if args.plot:
         plt.figure()
 
+    data = {}
+
     f = ROOT.TFile(args.output,"recreate")
     for i in range(16):
         channel = 'ch%i' % i
@@ -112,10 +118,14 @@ if __name__ == '__main__':
             continue
 
         bins = get_bins(charge[channel])
+        hist, bins = np.histogram(charge[channel],bins=bins)
+        bincenters = (bins[1:] + bins[:-1])/2
         h = ROOT.TH1D(channel,"Charge Integral for %s" % channel,len(bins),bins[0],bins[-1])
         for x in charge[channel]:
             h.Fill(x)
         h.GetXaxis().SetTitle("Charge (pC)")
+
+        data['ch%i_511' % i] = bincenters[np.argmax(hist)]
         
         if args.plot:
             plt.subplot(4,4,i+1)
@@ -124,8 +134,91 @@ if __name__ == '__main__':
             plt.title(channel)
 
         h.Write()
-                    
+
     f.Close()
+
+    for i in range(16,32):
+        data['ch%i_511' % i] = None
+
+    if 'BTL_DB_PASSWORD' not in os.environ:
+        print("need to set BTL_DB_PASSWORD environment variable!",file=sys.stderr)
+        sys.exit(1)
+
+    conn = psycopg2.connect(dbname='btl_qa',
+                            user='btl_test',
+                            host='localhost',
+                            password=os.environ['BTL_DB_PASSWORD'])
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO btl_qa ("
+        "ch0_511  , "
+        "ch1_511  , "
+        "ch2_511  , "
+        "ch3_511  , "
+        "ch4_511  , "
+        "ch5_511  , "
+        "ch6_511  , "
+        "ch7_511  , "
+        "ch8_511  , "
+        "ch9_511  , "
+        "ch10_511 , "
+        "ch11_511 , "
+        "ch12_511 , "
+        "ch13_511 , "
+        "ch14_511 , "
+        "ch15_511 , "
+        "ch16_511 , "
+        "ch17_511 , "
+        "ch18_511 , "
+        "ch19_511 , "
+        "ch20_511 , "
+        "ch21_511 , "
+        "ch22_511 , "
+        "ch23_511 , "
+        "ch24_511 , "
+        "ch25_511 , "
+        "ch26_511 , "
+        "ch27_511 , "
+        "ch28_511 , "
+        "ch29_511 , "
+        "ch30_511 , "
+        "ch31_511 , "
+        "institution) VALUES ("
+        "%(ch0_511)s, "
+        "%(ch1_511)s, "
+        "%(ch2_511)s, "
+        "%(ch3_511)s, "
+        "%(ch4_511)s, "
+        "%(ch5_511)s, "
+        "%(ch6_511)s, "
+        "%(ch7_511)s, "
+        "%(ch8_511)s, "
+        "%(ch9_511)s, "
+        "%(ch10_511)s, "
+        "%(ch11_511)s, "
+        "%(ch12_511)s, "
+        "%(ch13_511)s, "
+        "%(ch14_511)s, "
+        "%(ch15_511)s, "
+        "%(ch16_511)s, "
+        "%(ch17_511)s, "
+        "%(ch18_511)s, "
+        "%(ch19_511)s, "
+        "%(ch20_511)s, "
+        "%(ch21_511)s, "
+        "%(ch22_511)s, "
+        "%(ch23_511)s, "
+        "%(ch24_511)s, "
+        "%(ch25_511)s, "
+        "%(ch26_511)s, "
+        "%(ch27_511)s, "
+        "%(ch28_511)s, "
+        "%(ch29_511)s, "
+        "%(ch30_511)s, "
+        "%(ch31_511)s, "
+        "'Caltech'::inst)",
+        data)
 
     if args.plot:
         plt.show()
