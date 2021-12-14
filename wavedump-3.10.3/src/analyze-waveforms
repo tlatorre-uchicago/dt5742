@@ -150,7 +150,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     conn = psycopg2.connect(dbname='btl_qa',
-                            user='btl_test',
+                            user='btl',
                             host='localhost',
                             password=os.environ['BTL_DB_PASSWORD'])
     conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)

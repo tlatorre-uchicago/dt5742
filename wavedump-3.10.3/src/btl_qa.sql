@@ -25,15 +25,15 @@ GRANT ALL ON SEQUENCE btl_qa_key_seq TO btl_admin;
 CREATE ROLE btl_read;
 
 -- btl read user has select rights on everything in the btl schema
-GRANT SELECT ON btl_qa TO detector_read;
-GRANT SELECT ON SEQUENCE btl_qa_key_seq TO detector_read;
+GRANT SELECT ON btl_qa TO btl_read;
+GRANT SELECT ON SEQUENCE btl_qa_key_seq TO btl_read;
 
 -- create btl write user
 CREATE ROLE btl_write;
 
 -- btl write user has select rights on everything in the btl schema
-GRANT SELECT, INSERT ON btl_qa TO detector_read;
-GRANT SELECT, USAGE ON SEQUENCE btl_qa_key_seq TO detector_read;
+GRANT SELECT, INSERT ON btl_qa TO btl_write;
+GRANT SELECT, USAGE ON SEQUENCE btl_qa_key_seq TO btl_write;
 
 -- create btl user
 CREATE ROLE btl WITH LOGIN;
@@ -45,8 +45,8 @@ GRANT btl_read, btl_write TO btl;
 CREATE ROLE cms WITH LOGIN;
 
 -- this is the role used by the website, should only have read access
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO snoplus;
-GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO snoplus;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO cms;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO cms;
 
 -----------------------------
 -- Set up ownership of tables
