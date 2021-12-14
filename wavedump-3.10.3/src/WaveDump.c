@@ -1497,6 +1497,9 @@ int main(int argc, char *argv[])
     sprintf(path, "");
     int ReloadCfgStatus = 0x7FFFFFFF; // Init to the bigger positive number
 
+    memset(&WDrun, 0, sizeof(WDrun));
+    memset(&WDcfg, 0, sizeof(WDcfg));
+
     set_default_configuration(&WDcfg);
 
     WDcfg.LinkType = 0;
@@ -1585,7 +1588,7 @@ int main(int argc, char *argv[])
     //DAC_Calibration_data DAC_Calib;
     //char ipAddress[25];
 
-    for (i = 0; i < argc; i++) {
+    for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i],"-n") && i < argc - 1) {
             nevents = atoi(argv[++i]);
         } else if (!strcmp(argv[i],"-o") && i < argc - 1) {
@@ -1599,24 +1602,22 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!config_filename || !output_filename)
+    if (!output_filename)
         print_help();
 
     signal(SIGINT, sigint_handler);
 
-    memset(&WDrun, 0, sizeof(WDrun));
-    memset(&WDcfg, 0, sizeof(WDcfg));
-
-    strcpy(ConfigFileName, config_filename);
-
-    //printf("Opening Configuration File %s\n", ConfigFileName);
-    //f_ini = fopen(ConfigFileName, "r");
-    //if (f_ini == NULL) {
-    //    fprintf(stderr, "couldn't find configuration file '%s'\n", ConfigFileName);
-    //    goto QuitProgram;
-    //}
-    //ParseConfigFile(f_ini, &WDcfg);
-    //fclose(f_ini);
+    if (config_filename) {
+        printf("Opening Configuration File %s\n", config_filename);
+        f_ini = fopen(config_filename, "r");
+        if (f_ini == NULL) {
+            fprintf(stderr, "couldn't find configuration file '%s'\n", config_filename);
+            goto QuitProgram;
+        }
+        memset(&WDcfg, 0, sizeof(WDcfg));
+        ParseConfigFile(f_ini, &WDcfg);
+        fclose(f_ini);
+    }
 
     /* Open the digitizer. */
     ret = CAEN_DGTZ_OpenDigitizer(0, 0, 0, 0, &handle);
