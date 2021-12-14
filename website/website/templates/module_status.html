@@ -17,6 +17,29 @@
 	</div>
 	{% else %}
 	<div class="row">
+	    <div class="col-md-2">
+                <h3>Test Info</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Date</th>
+                        <td>{{ info['timestamp'].strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                    </tr>
+                    <tr>
+                        <th>Barcode</th>
+                        <td>{{ info['barcode'] }}</td>
+                    </tr>
+                    <tr>
+                        <th>Voltage</th>
+                        <td>{{ info['voltage'] }}</td>
+                    </tr>
+                    <tr>
+                        <th>Institution</th>
+                        <td>{{ info['institution'] }}</td>
+                    </tr>
+                </table>
+	    </div>
+        </div>
+	<div class="row">
 	    <div class="col-md-12" id='ch-511'></div>
         </div>
 	{% endif %}
