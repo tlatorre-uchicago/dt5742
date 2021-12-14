@@ -2047,7 +2047,8 @@ Restart:
         printf("got %i events\n", NumEvents);
 
         /* Analyze data */
-        for(i = 0; i < (int)NumEvents; i++) {
+        nread = 0;
+        for (i = 0; i < (int)NumEvents; i++) {
             /* Get one event from the readout buffer */
             ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
             if (ret) {
@@ -2074,22 +2075,21 @@ Restart:
 
                         chmask |= 1 << (gr*8 + ch);
                         for(int j = 0; j < Size; j++) {
-                            wfdata[nread+i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
+                            wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                         }
                     }
                 }
             }
             nread += 1;
+        }
 
-            if (nread >= chunk) {
-                printf("writing %i events to file\n", nread);
-                if (add_to_output_file(output_filename, wfdata, nread, chmask, nsamples, &WDcfg)) {
-                    goto QuitProgram;
-                }
-                nread = 0;
-                total_events += nread;
+        printf("writing %i events to file\n", nread);
+        if (NumEvents > 0) {
+            if (add_to_output_file(output_filename, wfdata, NumEvents, chmask, nsamples, &WDcfg)) {
+                goto QuitProgram;
             }
         }
+        total_events += NumEvents;
 
         usleep(100000);
     }
