@@ -1427,6 +1427,46 @@ void print_help()
     exit(1);
 }
 
+static void set_default_configuration(WaveDumpConfig_t *WDcfg)
+{
+    int i, j;
+
+    WDcfg->RecordLength = (1024*16);
+    WDcfg->PostTrigger = 50;
+    WDcfg->NumEvents = 1023;
+    WDcfg->EnableMask = 0xFFFF;
+    WDcfg->GWn = 0;
+    WDcfg->ExtTriggerMode = CAEN_DGTZ_TRGMODE_ACQ_ONLY;
+    WDcfg->InterruptNumEvents = 0;
+    WDcfg->TestPattern = 0;
+    WDcfg->DecimationFactor = 1;
+    WDcfg->DesMode = 0;
+    WDcfg->FastTriggerMode = 0; 
+    WDcfg->FastTriggerEnabled = 0; 
+    WDcfg->FPIOtype = 0;
+
+    strcpy(WDcfg->GnuPlotPath, GNUPLOT_DEFAULT_PATH);
+    for (i = 0; i < MAX_SET; i++) {
+	WDcfg->PulsePolarity[i] = CAEN_DGTZ_PulsePolarityPositive;
+	WDcfg->Version_used[i] = 0;
+	WDcfg->DCoffset[i] = 0;
+	WDcfg->Threshold[i] = 0;
+        WDcfg->ChannelTriggerMode[i] = CAEN_DGTZ_TRGMODE_DISABLED;
+	WDcfg->GroupTrgEnableMask[i] = 0;
+	for (j = 0; j < MAX_SET; j++)
+            WDcfg->DCoffsetGrpCh[i][j] = -1;
+	WDcfg->FTThreshold[i] = 0;
+	WDcfg->FTDCoffset[i] =0;
+    }
+
+    WDcfg->useCorrections = -1;
+    WDcfg->UseManualTables = -1;
+    for (i = 0; i < MAX_X742_GROUP_SIZE; i++)
+        sprintf(WDcfg->TablesFilenames[i], "Tables_gr%d", i);
+    WDcfg->DRS4Frequency = CAEN_DGTZ_DRS4_5GHz;
+    WDcfg->StartupCalibration = 1;
+}
+
 int main(int argc, char *argv[])
 {
     WaveDumpConfig_t   WDcfg;
@@ -1434,7 +1474,7 @@ int main(int argc, char *argv[])
     CAEN_DGTZ_ErrorCode ret = CAEN_DGTZ_Success;
     int  handle = -1;
     ERROR_CODES ErrCode= ERR_NONE;
-    int i, ch, Nb=0, Ne=0;
+    int i, j, ch, Nb=0, Ne=0;
     uint32_t AllocatedSize, BufferSize, NumEvents;
     char *buffer = NULL;
     char *EventPtr = NULL;
@@ -1452,16 +1492,98 @@ int main(int argc, char *argv[])
 
     CAEN_DGTZ_X742_EVENT_t *Event742 = NULL;
 
-    WDPlot_t                    *PlotVar=NULL;
     FILE *f_ini;
     CAEN_DGTZ_DRS4Correction_t X742Tables[MAX_X742_GROUP_SIZE];
-#ifdef  WIN32
-    sprintf(path, "%s\\WaveDump\\", getenv("USERPROFILE"));
-    _mkdir(path);
-#else
     sprintf(path, "");
-#endif
     int ReloadCfgStatus = 0x7FFFFFFF; // Init to the bigger positive number
+
+    set_default_configuration(&WDcfg);
+
+    WDcfg.LinkType = 0;
+    WDcfg.LinkNum = 0;
+    WDcfg.ConetNode = 0;
+    WDcfg.BaseAddress = 0;
+    //int Nch;
+    //int Nbit;
+    //float Ts;
+    //int NumEvents;
+    WDcfg.RecordLength = 1024;
+    WDcfg.PostTrigger = 50;
+    //int InterruptNumEvents;
+
+    /* Disable test pattern. */
+    WDcfg.TestPattern = 0;
+    CAEN_DGTZ_EnaDis_t DesMode;
+    //int TriggerEdge;
+    CAEN_DGTZ_IOLevel_t FPIOtype;
+
+    /* Set to enable external triggers, so we can trigger on the laser if we
+     * want. */
+    WDcfg.ExtTriggerMode = CAEN_DGTZ_TRGMODE_ACQ_ONLY;
+
+    /* Enable all channels. */
+    WDcfg.EnableMask = 0xFF;
+
+    CAEN_DGTZ_TriggerMode_t ChannelTriggerMode[MAX_SET];
+
+    /* Set to trigger on negative pulses. */
+    for (i = 0; i < MAX_SET; i++)
+	WDcfg.PulsePolarity[i] = CAEN_DGTZ_PulsePolarityNegative;
+
+    /* Set the DC offset of the channels. Not sure exactly what the difference between DCoffset and DCoffsetGrpCh is. */
+    int dc = 0;
+    int val;
+    for (i = 0; i < MAX_SET; i++) {
+	val = (int)((dc+50) * 65535 / 100); ///DC offset (percent of the dynamic range, -50 to 50)
+        WDcfg.DCoffset[i] = val;
+        for (j = 0; j < MAX_SET; j++) {
+            WDcfg.DCoffsetGrpCh[i][j] = val;
+        }
+    }
+
+    /* Don't care about the threshold because we set it later. */
+    //uint32_t Threshold[MAX_SET];
+
+    /* Not sure what this is. */
+    //int Version_used[MAX_SET];
+
+    for (i = 0; i < MAX_SET; i++)
+        WDcfg.GroupTrgEnableMask[i] = 0xff;
+
+    //uint32_t MaxGroupNumber;
+	
+    /* Fast trigger offset and threshold. Currently unused. */
+    //uint32_t FTDCoffset[MAX_SET];
+    //uint32_t FTThreshold[MAX_SET];
+
+    /* Disable fast trigger. */
+    WDcfg.FastTriggerEnabled = 0;
+    WDcfg.FastTriggerMode = CAEN_DGTZ_TRGMODE_DISABLED;
+
+    /* Generic write stuff. Don't care about this. */
+    //int GWn;
+    //uint32_t GWaddr[MAX_GW];
+    //uint32_t GWdata[MAX_GW];
+    //uint32_t GWmask[MAX_GW];
+    //OUTFILE_FLAGS OutFileFlags;
+    //uint16_t DecimationFactor;
+
+    /* Set corrections to "AUTO" */
+    WDcfg.useCorrections = -1;
+    //int UseManualTables;
+
+    //char TablesFilenames[MAX_X742_GROUP_SIZE][1000];
+
+    /* Set DRS4 Frequency.  Values:
+     *   0 = 5 GHz
+     *   1 = 2.5 GHz
+     *   2 = 1 GHz
+     *   3 = 750 MHz */
+    WDcfg.DRS4Frequency = (CAEN_DGTZ_DRS4Frequency_t) 2;
+
+    //int StartupCalibration;
+    //DAC_Calibration_data DAC_Calib;
+    //char ipAddress[25];
 
     for (i = 0; i < argc; i++) {
         if (!strcmp(argv[i],"-n") && i < argc - 1) {
@@ -1487,31 +1609,25 @@ int main(int argc, char *argv[])
 
     strcpy(ConfigFileName, config_filename);
 
-    printf("Opening Configuration File %s\n", ConfigFileName);
-    f_ini = fopen(ConfigFileName, "r");
-    if (f_ini == NULL) {
-        fprintf(stderr, "couldn't find configuration file '%s'\n", ConfigFileName);
-        goto QuitProgram;
-    }
-    ParseConfigFile(f_ini, &WDcfg);
-    fclose(f_ini);
+    //printf("Opening Configuration File %s\n", ConfigFileName);
+    //f_ini = fopen(ConfigFileName, "r");
+    //if (f_ini == NULL) {
+    //    fprintf(stderr, "couldn't find configuration file '%s'\n", ConfigFileName);
+    //    goto QuitProgram;
+    //}
+    //ParseConfigFile(f_ini, &WDcfg);
+    //fclose(f_ini);
 
-    /* Open the digitizer and read the board information */
-    isVMEDevice = WDcfg.BaseAddress ? 1 : 0;
-
-    printf("LinkType = %i\n", WDcfg.LinkType);
-    printf("ConetNode = %i\n", WDcfg.ConetNode);
-    printf("BaseAddress = %i\n", WDcfg.BaseAddress);
-    printf("args = %p\n", (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum));
-    printf("LinkNum = %i\n", WDcfg.LinkNum);
-
+    /* Open the digitizer. */
     ret = CAEN_DGTZ_OpenDigitizer(0, 0, 0, 0, &handle);
+
     if (ret) {
         fprintf(stderr, "unable to open digitizer! Is it turned on?\n");
         goto QuitProgram;
     }
 
     ret = CAEN_DGTZ_GetInfo(handle, &BoardInfo);
+
     if (ret) {
         fprintf(stderr, "unable to get board info.\n");
         ErrCode = ERR_BOARD_INFO_READ;
@@ -1536,12 +1652,11 @@ int main(int argc, char *argv[])
         goto QuitProgram;
     }
 
-
-    //Check for possible board internal errors
+    /* Check for possible board internal errors */
     ret = CheckBoardFailureStatus(handle, BoardInfo);
     if (ret) {
-            ErrCode = ERR_BOARD_FAILURE;
-            goto QuitProgram;
+        ErrCode = ERR_BOARD_FAILURE;
+        goto QuitProgram;
     }
 
     //set default DAC calibration coefficients
@@ -1549,6 +1664,7 @@ int main(int argc, char *argv[])
             WDcfg.DAC_Calib.cal[i] = 1;
             WDcfg.DAC_Calib.offset[i] = 0;
     }
+
     //load DAC calibration data (if present in flash)
     if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
             Load_DAC_Calibration_From_Flash(handle, &WDcfg, BoardInfo);
