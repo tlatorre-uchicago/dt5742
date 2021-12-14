@@ -40,5 +40,5 @@ CREATE TABLE btl_qa (
     ch29_511            real,
     ch30_511            real,
     ch31_511            real,
-    institution         inst DEFAULT 'Caltech'::inst NOT NULL,
+    institution         inst DEFAULT 'Caltech'::inst NOT NULL
 );
