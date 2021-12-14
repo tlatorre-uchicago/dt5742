@@ -1293,7 +1293,11 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
             /* Create the dataset creation property list, add the gzip compression
              * filter and set the chunk size. */
             dcpl = H5Pcreate(H5P_DATASET_CREATE);
-            status = H5Pset_deflate(dcpl, 9);
+
+            /* Set gzip level. Right now we set it to 0 (no compression), since
+             * it's *much* faster to write. In the future if we can make it
+             * faster and/or need smaller files you can increase this to 9. */
+            status = H5Pset_deflate(dcpl, 0);
             status = H5Pset_chunk(dcpl, 2, chunk);
 
             sprintf(dset_name, "ch%i", i);
@@ -1662,13 +1666,13 @@ int main(int argc, char *argv[])
 
     //set default DAC calibration coefficients
     for (i = 0; i < MAX_SET; i++) {
-            WDcfg.DAC_Calib.cal[i] = 1;
-            WDcfg.DAC_Calib.offset[i] = 0;
+        WDcfg.DAC_Calib.cal[i] = 1;
+        WDcfg.DAC_Calib.offset[i] = 0;
     }
 
     //load DAC calibration data (if present in flash)
     if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
-            Load_DAC_Calibration_From_Flash(handle, &WDcfg, BoardInfo);
+        Load_DAC_Calibration_From_Flash(handle, &WDcfg, BoardInfo);
 
     // Perform calibration (if needed).
     if (WDcfg.StartupCalibration)
@@ -1779,22 +1783,25 @@ Restart:
         ErrCode = ERR_MALLOC;
         goto QuitProgram;
     }
-    ret = CAEN_DGTZ_MallocReadoutBuffer(handle, &buffer,&AllocatedSize); /* WARNING: This malloc must be done after the digitizer programming */
+
+    /* WARNING: This malloc must be done after the digitizer programming */
+    ret = CAEN_DGTZ_MallocReadoutBuffer(handle, &buffer,&AllocatedSize);
+
     if (ret) {
         ErrCode = ERR_MALLOC;
         goto QuitProgram;
     }
 
-    if (WDrun.Restart && WDrun.AcqRun) 
-    {
+    if (WDrun.Restart && WDrun.AcqRun) {
         usleep(300000);
 
         if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
             Set_relative_Threshold(handle, &WDcfg, BoardInfo);
 
         CAEN_DGTZ_SWStartAcquisition(handle);
-    } else
+    } else {
         printf("[s] start/stop the acquisition, [q] quit, [SPACE] help\n");
+    }
     WDrun.Restart = 0;
     PrevRateTime = get_time();
 
@@ -1913,7 +1920,6 @@ Restart:
         thresholds[i] -= 50;
 
         if (thresholds[i] < 1e99) {
-            thresholds[i] = 2500;
             printf("setting trigger threshold for group %i to %i\n", i, (int) thresholds[i]);
             ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, (int) thresholds[i]);
 
