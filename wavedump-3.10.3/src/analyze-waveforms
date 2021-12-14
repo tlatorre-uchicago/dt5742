@@ -74,6 +74,8 @@ if __name__ == '__main__':
     parser.add_argument('filenames',nargs='+',help='input filenames (hdf5 format)')
     parser.add_argument('-o','--output', default=None, help='output file name', required=True)
     parser.add_argument('--plot', default=False, action='store_true', help='plot the waveforms and charge integral')
+    parser.add_argument('-b','--barcode', type=int, default=None, required=True, help='barcode of the module')
+    parser.add_argument('-v','--voltage', type=float, default=None, required=True, help='voltage')
     args = parser.parse_args()
 
     charge = {}
@@ -109,6 +111,9 @@ if __name__ == '__main__':
         plt.figure()
 
     data = {}
+    data['ch_511'] = []
+    data['barcode'] = args.barcode
+    data['voltage'] = args.voltage
 
     f = ROOT.TFile(args.output,"recreate")
     for i in range(16):
@@ -125,7 +130,7 @@ if __name__ == '__main__':
             h.Fill(x)
         h.GetXaxis().SetTitle("Charge (pC)")
 
-        data['ch%i_511' % i] = bincenters[np.argmax(hist)]
+        data['ch_511'].append(bincenters[np.argmax(hist)])
         
         if args.plot:
             plt.subplot(4,4,i+1)
@@ -138,7 +143,7 @@ if __name__ == '__main__':
     f.Close()
 
     for i in range(16,32):
-        data['ch%i_511' % i] = None
+        data['ch_511'].append(None)
 
     if 'BTL_DB_PASSWORD' not in os.environ:
         print("need to set BTL_DB_PASSWORD environment variable!",file=sys.stderr)
@@ -151,74 +156,7 @@ if __name__ == '__main__':
     conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO btl_qa ("
-        "ch0_511  , "
-        "ch1_511  , "
-        "ch2_511  , "
-        "ch3_511  , "
-        "ch4_511  , "
-        "ch5_511  , "
-        "ch6_511  , "
-        "ch7_511  , "
-        "ch8_511  , "
-        "ch9_511  , "
-        "ch10_511 , "
-        "ch11_511 , "
-        "ch12_511 , "
-        "ch13_511 , "
-        "ch14_511 , "
-        "ch15_511 , "
-        "ch16_511 , "
-        "ch17_511 , "
-        "ch18_511 , "
-        "ch19_511 , "
-        "ch20_511 , "
-        "ch21_511 , "
-        "ch22_511 , "
-        "ch23_511 , "
-        "ch24_511 , "
-        "ch25_511 , "
-        "ch26_511 , "
-        "ch27_511 , "
-        "ch28_511 , "
-        "ch29_511 , "
-        "ch30_511 , "
-        "ch31_511 , "
-        "institution) VALUES ("
-        "%(ch0_511)s, "
-        "%(ch1_511)s, "
-        "%(ch2_511)s, "
-        "%(ch3_511)s, "
-        "%(ch4_511)s, "
-        "%(ch5_511)s, "
-        "%(ch6_511)s, "
-        "%(ch7_511)s, "
-        "%(ch8_511)s, "
-        "%(ch9_511)s, "
-        "%(ch10_511)s, "
-        "%(ch11_511)s, "
-        "%(ch12_511)s, "
-        "%(ch13_511)s, "
-        "%(ch14_511)s, "
-        "%(ch15_511)s, "
-        "%(ch16_511)s, "
-        "%(ch17_511)s, "
-        "%(ch18_511)s, "
-        "%(ch19_511)s, "
-        "%(ch20_511)s, "
-        "%(ch21_511)s, "
-        "%(ch22_511)s, "
-        "%(ch23_511)s, "
-        "%(ch24_511)s, "
-        "%(ch25_511)s, "
-        "%(ch26_511)s, "
-        "%(ch27_511)s, "
-        "%(ch28_511)s, "
-        "%(ch29_511)s, "
-        "%(ch30_511)s, "
-        "%(ch31_511)s, "
-        "'Caltech'::inst)",
-        data)
+    cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, 'Caltech'::inst)", data)
 
     if args.plot:
         plt.show()
