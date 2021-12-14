@@ -192,7 +192,7 @@
 			</tr>
 		    </thead>
 		    {% for row in results %}
-		    <tr onclick="window.document.location = '{{ "module-status?barcode=%i" % row['barcode'] }}';">
+		    <tr onclick="window.document.location = '{{ "module-status?key=%i" % row['key'] }}';">
                         <td>{{ row['timestamp'] | time_from_now }}</td>
 			<td>{{ row['barcode'] }}</td>
 			<td>{{ row['voltage'] }}</td>

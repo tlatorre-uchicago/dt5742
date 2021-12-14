@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% block title %}Module Status{% endblock %}
+{% block head %}
+    <!-- metrics-graphics stylesheet goes above super() because we want bootstrap's style
+    (which is linked in super()) to override it. -->
+    <link rel="stylesheet" type="text/css"  href="{{ url_for('static',filename='css/metricsgraphics.css') }}">
+    <link rel="stylesheet" type="text/css"  href="{{ url_for('static',filename='css/mg_line_brushing.css') }}">
+    {{ super() }}
+{% endblock %}
+{% block body %}
+    {{ super() }}
+    <div class="container">
+	{% if error %}
+	<div class="alert alert-danger" role="alert">
+	<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+	Error: {{ error }}
+	</div>
+	{% else %}
+	<div class="row">
+	    <div class="col-md-12" id='ch-511'></div>
+        </div>
+	{% endif %}
+    </div>
+{% endblock %}
+{% block script %}
+    <script src="{{ url_for('static', filename='js/d3.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/metricsgraphics.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mg_line_brushing.js') }}"></script>
+
+    <script>
+        var ch_511 = {{ info['ch_511'] | tojson }};
+
+        var ch_511_data = new Array();
+        for (var i=0; i < ch_511.length; i++) {
+            ch_511_data.push({'x': i, 'y': ch_511[i]});
+        }
+
+        MG.data_graphic({
+            title: "Sodium-22 511 Peak",
+            description: "Charge of 511 Peak",
+            data: ch_511_data,
+            chart_type: 'point',
+            width: $('#ch-511').width(),
+            height: 250,
+            left: 100,
+            target: '#ch-511',
+            x_accessor: 'x',
+            y_accessor: 'y',
+            x_label: 'Channel',
+            y_label: 'Charge (pC)'
+        });
+    </script>
+{% endblock %}

@@ -10,7 +10,7 @@ from math import isnan
 import os
 import sys
 import random
-from .channeldb import get_modules
+from .moduledb import get_modules, get_module_info
 from datetime import datetime
 import pytz
 
@@ -27,7 +27,7 @@ def module_database():
     limit = request.args.get("limit", 100, type=int)
     sort_by = request.args.get("sort-by", "timestamp")
     results = get_modules(request.args, limit, sort_by)
-    return render_template('channel_database.html', results=results, limit=limit, sort_by=sort_by)
+    return render_template('module_database.html', results=results, limit=limit, sort_by=sort_by)
 
 @app.template_filter('time_from_now')
 def time_from_now(dt):
@@ -64,23 +64,12 @@ def time_from_now(dt):
     else:
         return "%i years ago" % int(round(delta/(365.25*24*3600)))
 
-@app.route('/channel-status')
-def channel_status():
-    crate = request.args.get("crate", 0, type=int)
-    slot = request.args.get("slot", 0, type=int)
-    channel = request.args.get("channel", 0, type=int)
-    results = get_channel_history(crate, slot, channel)
-    pmt_info = get_pmt_info(crate, slot, channel)
-    nominal_settings = get_nominal_settings(crate, slot, channel)
-    polling_info = get_most_recent_polling_info(crate, slot, channel)
-    discriminator_threshold = get_discriminator_threshold(crate, slot)
-    gtvalid_lengths = get_gtvalid_lengths(crate, slot)
-    fec_db_history = get_fec_db_history(crate, slot, channel)
-    vmon, bad_vmon = get_vmon(crate, slot)
-    test_failed = get_penn_daq_tests(crate, slot, channel)
-    qhs, qhl, qlx = get_pedestals(crate, slot, channel)
-    return render_template('channel_status.html', crate=crate, slot=slot, channel=channel, results=results, pmt_info=pmt_info, nominal_settings=nominal_settings, polling_info=polling_info, discriminator_threshold=discriminator_threshold, gtvalid_lengths=gtvalid_lengths, fec_db_history=fec_db_history, vmon=vmon, bad_vmon=bad_vmon, qhs=qhs, qhl=qhl, qlx=qlx, test_failed=test_failed)
+@app.route('/module-status')
+def module_status():
+    key = request.args.get("key", 0, type=int)
+    info = get_module_info(key=key)
+    return render_template('module_status.html', info=info)
 
 @app.route('/')
 def index():
-    return redirect(url_for('channel_database'))
+    return redirect(url_for('module_database'))

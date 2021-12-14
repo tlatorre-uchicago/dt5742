@@ -3,6 +3,21 @@ from .views import app
 import psycopg2
 import psycopg2.extensions
 
+def get_module_info(key):
+    conn = engine.connect()
+
+    query = "SELECT * FROM btl_qa WHERE key = %s"
+
+    result = conn.execute(query, (key,))
+
+    if result is None:
+        return None
+
+    keys = result.keys()
+    row = result.fetchone()
+
+    return dict(zip(keys,row))
+
 def get_modules(kwargs, limit=100, sort_by=None):
     """
     Returns a list of the current channel statuses for multiple channels in the
