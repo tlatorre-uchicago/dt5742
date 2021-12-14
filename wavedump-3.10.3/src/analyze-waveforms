@@ -76,6 +76,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', default=False, action='store_true', help='plot the waveforms and charge integral')
     parser.add_argument('-b','--barcode', type=int, default=None, required=True, help='barcode of the module')
     parser.add_argument('-v','--voltage', type=float, default=None, required=True, help='voltage')
+    parser.add_argument('-u','--upload', default=False, action='store_true', help='upload results to the database')
     args = parser.parse_args()
 
     charge = {}
@@ -145,18 +146,21 @@ if __name__ == '__main__':
     for i in range(16,32):
         data['ch_511'].append(None)
 
-    if 'BTL_DB_PASSWORD' not in os.environ:
-        print("need to set BTL_DB_PASSWORD environment variable!",file=sys.stderr)
-        sys.exit(1)
+    if args.upload:
+        if 'BTL_DB_PASSWORD' not in os.environ:
+            print("need to set BTL_DB_PASSWORD environment variable!",file=sys.stderr)
+            sys.exit(1)
 
-    conn = psycopg2.connect(dbname='btl_qa',
-                            user='btl',
-                            host='localhost',
-                            password=os.environ['BTL_DB_PASSWORD'])
-    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        print("Uploading results to the database...")
+        conn = psycopg2.connect(dbname='btl_qa',
+                                user='btl',
+                                host='localhost',
+                                password=os.environ['BTL_DB_PASSWORD'])
+        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, 'Caltech'::inst)", data)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, 'Caltech'::inst)", data)
+        print("Done")
 
     if args.plot:
         plt.show()
