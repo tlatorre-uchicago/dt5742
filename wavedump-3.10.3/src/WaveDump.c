@@ -1502,8 +1502,10 @@ int main(int argc, char *argv[])
     printf("LinkType = %i\n", WDcfg.LinkType);
     printf("ConetNode = %i\n", WDcfg.ConetNode);
     printf("BaseAddress = %i\n", WDcfg.BaseAddress);
+    printf("args = %p\n", (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum));
+    printf("LinkNum = %i\n", WDcfg.LinkNum);
 
-    ret = CAEN_DGTZ_OpenDigitizer2(WDcfg.LinkType, (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum), WDcfg.ConetNode, WDcfg.BaseAddress, &handle);
+    ret = CAEN_DGTZ_OpenDigitizer(0, 0, 0, 0, &handle);
     if (ret) {
         fprintf(stderr, "unable to open digitizer! Is it turned on?\n");
         goto QuitProgram;
