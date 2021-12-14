@@ -69,43 +69,17 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Analyze data from the Agilent scope')
     parser.add_argument('filenames',nargs='+',help='input filenames (hdf5 format)')
     parser.add_argument('-o','--output', default=None, help='output file name', required=True)
-    parser.add_argument('--sodium', default=False, action='store_true', help='flag to indicate data is from a sodium source')
-    parser.add_argument('--laser', default=False, action='store_true', help='flag to indicate data is from a laser source')
     parser.add_argument('--plot', default=False, action='store_true', help='plot the waveforms and charge integral')
     args = parser.parse_args()
 
     charge = {}
     for filename in args.filenames:
         with h5py.File(filename) as f:
+            x = np.linspace(0,f.attrs['record_length']*1e3/f[channel].attrs['drs4_frequency'],f.attrs['record_length'])
             for channel in f:
-                if channel == 'settings':
-                    continue
+                y = f[channel]*2/0xfff
 
-                if 'yinc' in dict(f[channel].attrs):
-                    x = f[channel].attrs['xorg'] + np.linspace(0,f[channel].attrs['xinc']*f[channel].attrs['points'],int(f[channel].attrs['points']))
-
-                    if ':WAVeform:FORMat' in dict(f['settings'].attrs) and f['settings'].attrs[':WAVeform:FORMat'] != 'ASC':
-                        # convert word values -> voltages if the data was saved in a non-ascii format
-                        y = f[channel]*f[channel].attrs['yinc'] + f[channel].attrs['yorg']
-                    else:
-                        y = f[channel]
-                else:
-                    # In older versions of the code, I stored xorg, xinc, etc.
-                    # in the main HDF5 group and not on a per channel basis
-                    x = f.attrs['xorg'] + np.linspace(0,f.attrs['xinc']*f.attrs['points'],int(f.attrs['points']))
-
-                    if ':WAVeform:FORMat' in dict(f['settings'].attrs) and f['settings'].attrs[':WAVeform:FORMat'] != 'ASC':
-                        # convert word values -> voltages if the data was saved in a non-ascii format
-                        y = f[channel]*f.attrs['yinc'] + f.attrs['yorg']
-                    else:
-                        y = f[channel]
-
-                x *= 1e9
-
-                if args.sodium:
-                    a, b = get_window(x,y,left=20,right=150)
-                else:
-                    a, b = get_window(x,y,left=5,right=10)
+                a, b = get_window(x,y,left=20,right=400)
                 
                 charge[channel] = integrate(x,y, a, b)
                 
