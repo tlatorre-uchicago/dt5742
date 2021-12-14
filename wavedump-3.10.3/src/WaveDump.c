@@ -1427,9 +1427,6 @@ void print_help()
     exit(1);
 }
 
-/* ########################################################################### */
-/* MAIN                                                                        */
-/* ########################################################################### */
 int main(int argc, char *argv[])
 {
     WaveDumpConfig_t   WDcfg;
@@ -1453,10 +1450,8 @@ int main(int argc, char *argv[])
     int total_events = 0;
     int chunk = 10;
 
-    CAEN_DGTZ_UINT16_EVENT_t    *Event16=NULL; /* generic event struct with 16 bit data (10, 12, 14 and 16 bit digitizers */
+    CAEN_DGTZ_X742_EVENT_t *Event742 = NULL;
 
-    CAEN_DGTZ_UINT8_EVENT_t     *Event8=NULL; /* generic event struct with 8 bit data (only for 8 bit digitizers) */ 
-    CAEN_DGTZ_X742_EVENT_t       *Event742=NULL;  /* custom event struct with 8 bit data (only for 8 bit digitizers) */
     WDPlot_t                    *PlotVar=NULL;
     FILE *f_ini;
     CAEN_DGTZ_DRS4Correction_t X742Tables[MAX_X742_GROUP_SIZE];
@@ -1503,6 +1498,10 @@ int main(int argc, char *argv[])
 
     /* Open the digitizer and read the board information */
     isVMEDevice = WDcfg.BaseAddress ? 1 : 0;
+
+    printf("LinkType = %i\n", WDcfg.LinkType);
+    printf("ConetNode = %i\n", WDcfg.ConetNode);
+    printf("BaseAddress = %i\n", WDcfg.BaseAddress);
 
     ret = CAEN_DGTZ_OpenDigitizer2(WDcfg.LinkType, (WDcfg.LinkType == CAEN_DGTZ_ETH_V4718) ? WDcfg.ipAddress:(void *)&(WDcfg.LinkNum), WDcfg.ConetNode, WDcfg.BaseAddress, &handle);
     if (ret) {
@@ -1655,16 +1654,8 @@ Restart:
     }
 
     // Allocate memory for the event data and readout buffer
-    if(WDcfg.Nbit == 8)
-        ret = CAEN_DGTZ_AllocateEvent(handle, (void**)&Event8);
-    else {
-        if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE) {
-            ret = CAEN_DGTZ_AllocateEvent(handle, (void**)&Event16);
-        }
-        else {
-            ret = CAEN_DGTZ_AllocateEvent(handle, (void**)&Event742);
-        }
-    }
+    ret = CAEN_DGTZ_AllocateEvent(handle, (void**)&Event742);
+
     if (ret != CAEN_DGTZ_Success) {
         ErrCode = ERR_MALLOC;
         goto QuitProgram;
