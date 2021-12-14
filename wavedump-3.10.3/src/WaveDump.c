@@ -1293,7 +1293,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         }
 
         aid3  = H5Screate(H5S_SCALAR);
-        attr3 = H5Acreate3(file, "post_trigger", H5T_NATIVE_INT, aid3, H5P_DEFAULT, H5P_DEFAULT);
+        attr3 = H5Acreate2(file, "post_trigger", H5T_NATIVE_INT, aid3, H5P_DEFAULT, H5P_DEFAULT);
         int post_trigger = WDcfg->PostTrigger;
         ret = H5Awrite(attr3, H5T_NATIVE_INT, &post_trigger);
 
@@ -1303,7 +1303,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         }
 
         aid4  = H5Screate(H5S_SCALAR);
-        attr4 = H5Acreate4(file, "drs4_frequency", H5T_NATIVE_INT, aid4, H5P_DEFAULT, H5P_DEFAULT);
+        attr4 = H5Acreate2(file, "drs4_frequency", H5T_NATIVE_INT, aid4, H5P_DEFAULT, H5P_DEFAULT);
         int drs4_frequency = 0;
         switch (WDcfg->DRS4Frequency) {
         case 0:
