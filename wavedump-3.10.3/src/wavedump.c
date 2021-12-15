@@ -1367,7 +1367,7 @@ int add_to_output_file(char *filename, float data[WF_SIZE][32][1024], int n, int
         H5Tclose(atype);
 
         aid = H5Screate(H5S_SCALAR);
-        hid_t atype = H5Tcopy(H5T_C_S1);
+        atype = H5Tcopy(H5T_C_S1);
         H5Tset_size(atype, 100);
         H5Tset_strpad(atype, H5T_STR_NULLTERM);
         attr = H5Acreate2(file, "git_dirty", atype, aid, H5P_DEFAULT, H5P_DEFAULT);
