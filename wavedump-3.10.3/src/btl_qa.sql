@@ -18,9 +18,9 @@ CREATE TABLE btl_qa (
     ch_511              real[],
     avg_pulse_x         real[],
     avg_pulse_y         real[],
-    institution         inst DEFAULT 'Caltech'::inst NOT NULL
+    institution         inst DEFAULT 'Caltech'::inst NOT NULL,
     git_sha1            text,
-    git_dirty           integer,
+    git_dirty           text
 );
 
 -- Table to keep track of the light yield of the BTL modules.
@@ -28,8 +28,8 @@ CREATE TABLE modules (
     barcode             bigint PRIMARY KEY,
     timestamp           timestamp with time zone default now(),
     sipm                sipm_type NOT NULL,
-    institution         inst DEFAULT 'Caltech'::inst NOT NULL
-    comments            text,
+    institution         inst DEFAULT 'Caltech'::inst NOT NULL,
+    comments            text
 );
 
 -- create btl admin user

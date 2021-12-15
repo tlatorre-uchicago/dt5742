@@ -105,12 +105,12 @@ if __name__ == '__main__':
             charge[channel] = integrate(x,y, a, b)
 
             # FIXME: Should only get average pulse from events near 511 peak
-            if 'avg_pulse' in data:
+            if 'avg_pulse_y' in data:
                 data['avg_pulse_y'] += y.mean(axis=0)
                 data['avg_pulse_count'] += 1
             else:
                 data['avg_pulse_x'] = x
-                data['avg_pulse'] = y.mean(axis=0)
+                data['avg_pulse_y'] = y.mean(axis=0)
                 data['avg_pulse_count'] = 1
             
             if args.plot:
@@ -123,6 +123,8 @@ if __name__ == '__main__':
                 plt.axvline(x[b])
 
     data['avg_pulse_y'] /= data['avg_pulse_count']
+    data['avg_pulse_x'] = list(map(float,data['avg_pulse_x']))
+    data['avg_pulse_y'] = list(map(float,data['avg_pulse_y']))
 
     if args.plot:
         plt.figure()
