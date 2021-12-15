@@ -16,6 +16,8 @@ CREATE TABLE btl_qa (
     barcode             bigint NOT NULL,
     voltage             real NOT NULL,
     ch_511              real[],
+    ch_511_rise_time    real[],
+    ch_511_fall_time    real[],
     avg_pulse_x         real[],
     avg_pulse_y         real[],
     institution         inst DEFAULT 'Caltech'::inst NOT NULL,

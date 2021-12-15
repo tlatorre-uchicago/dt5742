@@ -66,6 +66,12 @@
 	<div class="row">
 	    <div class="col-md-12" id='avg-pulse'></div>
         </div>
+	<div class="row">
+	    <div class="col-md-12" id='ch-511-rise-time'></div>
+        </div>
+	<div class="row">
+	    <div class="col-md-12" id='ch-511-fall-time'></div>
+        </div>
 	{% endif %}
     </div>
 {% endblock %}
@@ -76,6 +82,8 @@
 
     <script>
         var ch_511 = {{ info['ch_511'] | tojson }};
+        var ch_511_rise_time = {{ info['ch_511_rise_time'] | tojson }};
+        var ch_511_fall_time = {{ info['ch_511_fall_time'] | tojson }};
         var avg_pulse_x = {{ info['avg_pulse_x'] | tojson }};
         var avg_pulse_y = {{ info['avg_pulse_y'] | tojson }};
 
@@ -83,6 +91,18 @@
         for (var i=0; i < ch_511.length; i++) {
             if (ch_511[i] !== null)
                 ch_511_data.push({'x': i, 'y': ch_511[i]});
+        }
+
+        var ch_511_rise_time_data = new Array();
+        for (var i=0; i < ch_511_rise_time.length; i++) {
+            if (ch_511_rise_time[i] !== null)
+                ch_511_rise_time_data.push({'x': i, 'y': ch_511_rise_time[i]});
+        }
+
+        var ch_511_fall_time_data = new Array();
+        for (var i=0; i < ch_511_fall_time.length; i++) {
+            if (ch_511_fall_time[i] !== null)
+                ch_511_fall_time_data.push({'x': i, 'y': ch_511_fall_time[i]});
         }
 
         var avg_pulse_data = new Array();
@@ -104,6 +124,36 @@
             y_accessor: 'y',
             x_label: 'Channel',
             y_label: 'Charge (pC)'
+        });
+
+        MG.data_graphic({
+            title: "Sodium-22 511 Rise Time",
+            description: "Rise Time of 511 Pulses",
+            data: ch_511_rise_time_data,
+            chart_type: 'point',
+            width: $('#ch-511-rise-time').width(),
+            height: 250,
+            left: 100,
+            target: '#ch-511-rise-time',
+            x_accessor: 'x',
+            y_accessor: 'y',
+            x_label: 'Channel',
+            y_label: 'Time (ns)'
+        });
+
+        MG.data_graphic({
+            title: "Sodium-22 511 Fall Time",
+            description: "Fall Time of 511 Pulses",
+            data: ch_511_fall_time_data,
+            chart_type: 'point',
+            width: $('#ch-511-fall-time').width(),
+            height: 250,
+            left: 100,
+            target: '#ch-511-fall-time',
+            x_accessor: 'x',
+            y_accessor: 'y',
+            x_label: 'Channel',
+            y_label: 'Time (ns)'
         });
 
         MG.data_graphic({

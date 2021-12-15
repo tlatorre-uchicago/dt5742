@@ -6,6 +6,30 @@ import numpy as np
 def iqr(x):
     return np.percentile(x,75) - np.percentile(x,25)
 
+def get_threshold_crossing(x, data, threshold=0.4, right=False):
+    """
+    Returns the times at which the waveforms in `x` cross 40% of their minimum
+    value.
+    """
+    data = np.asarray(data)
+    argmin = np.argmin(data,axis=-1)
+    thresholds = threshold*data[np.arange(data.shape[0]),argmin]
+    # FIXME: need to interpolate
+    if right:
+        return x[data.shape[1]-np.argmax(((np.arange(data.shape[1]) > argmin[:,np.newaxis]) & (data > thresholds[:,np.newaxis]))[:,::-1],axis=-1)-1]
+    else:
+        return x[data.shape[1]-np.argmax(((np.arange(data.shape[1]) < argmin[:,np.newaxis]) & (data > thresholds[:,np.newaxis]))[:,::-1],axis=-1)-1]
+
+def get_rise_time(x, data):
+    t10 = get_threshold_crossing(x, data, 0.1)
+    t90 = get_threshold_crossing(x, data, 0.9)
+    return t90 - t10
+
+def get_fall_time(x, data):
+    t10 = get_threshold_crossing(x, data, 0.1, right=True)
+    t90 = get_threshold_crossing(x, data, 0.9, right=True)
+    return t10 - t90
+
 def get_times(x, data, baseline=10):
     """
     Returns the times at which the waveforms in `x` cross 40% of their minimum
@@ -79,6 +103,8 @@ if __name__ == '__main__':
 
     data = {}
     data['ch_511'] = []
+    data['ch_511_rise_time'] = []
+    data['ch_511_fall_time'] = []
 
     charge = {}
     with h5py.File(args.filename) as f:
@@ -112,6 +138,9 @@ if __name__ == '__main__':
                 data['avg_pulse_x'] = x
                 data['avg_pulse_y'] = y.mean(axis=0)
                 data['avg_pulse_count'] = 1
+
+            data['ch_511_rise_time'].append(np.median(get_rise_time(x, y)))
+            data['ch_511_fall_time'].append(np.median(get_fall_time(x, y)))
             
             if args.plot:
                 plt.subplot(4,4,i+1)
@@ -158,6 +187,8 @@ if __name__ == '__main__':
 
     for i in range(16,32):
         data['ch_511'].append(None)
+        data['ch_511_rise_time'].append(None)
+        data['ch_511_fall_time'].append(None)
 
     if args.upload:
         if 'BTL_DB_PASSWORD' not in os.environ:
@@ -172,7 +203,7 @@ if __name__ == '__main__':
         conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, avg_pulse_x, avg_pulse_y, git_sha1, git_dirty, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(git_sha1)s, %(git_dirty)s, 'Caltech'::inst)", data)
+        cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, ch_511_rise_time, ch_511_fall_time, avg_pulse_x, avg_pulse_y, git_sha1, git_dirty, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, %(ch_511_rise_time)s, %(ch_511_fall_time)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(git_sha1)s, %(git_dirty)s, 'Caltech'::inst)", data)
         print("Done")
 
     if args.plot:
