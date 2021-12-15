@@ -9,6 +9,8 @@
 #include "unistd.h" /* for access(). */
 #include "signal.h" /* for SIGINT. */
 
+#define WF_SIZE 10000
+
 extern int dc_file[MAX_CH];
 extern int thr_file[MAX_CH];
 int cal_ok[MAX_CH] = { 0 };
@@ -1216,7 +1218,7 @@ int Set_calibrated_DCO(int handle, int ch, WaveDumpConfig_t *WDcfg, CAEN_DGTZ_Bo
 	return ret;
 }
 
-void get_baselines(float data[10000][32][1024], float *baselines, int n, int chmask, int nsamples)
+void get_baselines(float data[WF_SIZE][32][1024], float *baselines, int n, int chmask, int nsamples)
 {
     int i, j, k;
 
@@ -1249,7 +1251,7 @@ void get_baselines(float data[10000][32][1024], float *baselines, int n, int chm
  * off. The reason is that with the full compression (gzip level 9), it was too
  * slow and so the data taking time was dominated by the compression. There is
  * probably some way to speed this up, and if so, it can be re-enabled. */
-int add_to_output_file(char *filename, float data[10000][32][1024], int n, int chmask, int nsamples, WaveDumpConfig_t *WDcfg)
+int add_to_output_file(char *filename, float data[WF_SIZE][32][1024], int n, int chmask, int nsamples, WaveDumpConfig_t *WDcfg)
 {
     hid_t file, space, dset, dcpl, mem_space, file_space;
     herr_t status;
@@ -1928,12 +1930,15 @@ Restart:
         exit(1);
     }
 
-    static float wfdata[10000][32][1024];
+    static float wfdata[WF_SIZE][32][1024];
     float baselines[32];
     float thresholds[2];
 
     int chmask = 0;
     int nsamples = 0;
+
+    if (NumEvents > WF_SIZE)
+        NumEvents = WF_SIZE
 
     /* Analyze data */
     for(i = 0; i < NumEvents; i++) {
@@ -2065,6 +2070,9 @@ Restart:
                 exit(1);
             }
         }
+
+        if (NumEvents > WF_SIZE)
+            NumEvents = WF_SIZE
 
         printf("got %i events\n", NumEvents);
 
