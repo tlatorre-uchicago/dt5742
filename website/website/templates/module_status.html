@@ -55,7 +55,8 @@
 
         var ch_511_data = new Array();
         for (var i=0; i < ch_511.length; i++) {
-            ch_511_data.push({'x': i, 'y': ch_511[i]});
+            if (ch_511[i] !== null)
+                ch_511_data.push({'x': i, 'y': ch_511[i]});
         }
 
         MG.data_graphic({
