@@ -103,7 +103,15 @@ if __name__ == '__main__':
             a, b = get_window(x,y,left=20,right=400)
             
             charge[channel] = integrate(x,y, a, b)
-            data['avg_pulse_%s' % channel] = y.mean(axis=0)
+
+            # FIXME: Should only get average pulse from events near 511 peak
+            if 'avg_pulse' in data:
+                data['avg_pulse_y'] += y.mean(axis=0)
+                data['avg_pulse_count'] += 1
+            else:
+                data['avg_pulse_x'] = x
+                data['avg_pulse'] = y.mean(axis=0)
+                data['avg_pulse_count'] = 1
             
             if args.plot:
                 plt.subplot(4,4,i+1)
@@ -113,6 +121,8 @@ if __name__ == '__main__':
                 plt.title(channel)
                 plt.axvline(x[a])
                 plt.axvline(x[b])
+
+    data['avg_pulse_y'] /= data['avg_pulse_count']
 
     if args.plot:
         plt.figure()
@@ -160,7 +170,7 @@ if __name__ == '__main__':
         conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, git_sha1, git_dirty, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, %(git_sha1)s, %(git_dirty)s, 'Caltech'::inst)", data)
+        cursor.execute("INSERT INTO btl_qa (barcode, voltage, ch_511, avg_pulse_x, avg_pulse_y, git_sha1, git_dirty, institution) VALUES (%(barcode)s, %(voltage)s, %(ch_511)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(git_sha1)s, %(git_dirty)s, 'Caltech'::inst)", data)
         print("Done")
 
     if args.plot:
