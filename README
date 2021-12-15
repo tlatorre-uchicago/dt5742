@@ -54,7 +54,8 @@ First, you need to set an environment variable containing the password to the
 database, and ideally add it to your .bashrc:
 
 ```
-$ echo 'export BTL_DB_PASSWORD=[PASSWORD]' >> .bashrc
+$ echo 'export BTL_DB_HOST=[HOSTNAME]' >> .bashrc
+$ echo 'export BTL_DB_PASS=[PASSWORD]' >> .bashrc
 $ source .bashrc
 ```
 
