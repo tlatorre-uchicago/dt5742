@@ -1638,6 +1638,11 @@ int main(int argc, char *argv[])
     if (!output_filename || barcode == 0 || voltage < 0)
         print_help();
 
+    if (access(output_filename, F_OK) == 0) {
+        fprintf(stderr, "removing existing file '%s'\n", output_filename);
+        remove(output_filename);
+    }
+
     signal(SIGINT, sigint_handler);
 
     if (config_filename) {
