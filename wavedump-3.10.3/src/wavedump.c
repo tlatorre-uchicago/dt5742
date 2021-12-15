@@ -11,6 +11,9 @@
 
 #define WF_SIZE 10000
 
+char *GitSHA1(void);
+char *GitDirty(void);
+
 extern int dc_file[MAX_CH];
 extern int thr_file[MAX_CH];
 int cal_ok[MAX_CH] = { 0 };
@@ -1346,6 +1349,38 @@ int add_to_output_file(char *filename, float data[WF_SIZE][32][1024], int n, int
 
         H5Sclose(aid);
         H5Aclose(attr);
+
+        aid = H5Screate(H5S_SCALAR);
+        hid_t atype = H5Tcopy(H5T_C_S1);
+        H5Tset_size(atype, 100);
+        H5Tset_strpad(atype, H5T_STR_NULLTERM);
+        attr = H5Acreate2(file, "git_sha1", atype, aid, H5P_DEFAULT, H5P_DEFAULT);
+        ret = H5Awrite(attr, atype, GitSHA1());
+
+        if (ret) {
+            fprintf(stderr, "failed to write git_sha1 to hdf5 file.\n");
+            return 1;
+        }
+
+        H5Sclose(aid);
+        H5Aclose(attr);
+        H5Tclose(atype);
+
+        aid = H5Screate(H5S_SCALAR);
+        hid_t atype = H5Tcopy(H5T_C_S1);
+        H5Tset_size(atype, 100);
+        H5Tset_strpad(atype, H5T_STR_NULLTERM);
+        attr = H5Acreate2(file, "git_dirty", atype, aid, H5P_DEFAULT, H5P_DEFAULT);
+        ret = H5Awrite(attr, atype, GitDirty());
+
+        if (ret) {
+            fprintf(stderr, "failed to write git_sha1 to hdf5 file.\n");
+            return 1;
+        }
+
+        H5Sclose(aid);
+        H5Aclose(attr);
+        H5Tclose(atype);
 
         for (i = 0; i < 32; i++) {
             if (!(chmask & (1 << i))) continue;

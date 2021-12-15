@@ -4,6 +4,11 @@ CREATE TYPE inst AS ENUM (
     'Rome'
 );
 
+CREATE TYPE sipm_type AS ENUM (
+    'HPK',
+    'FBK'
+);
+
 -- Table to keep track of the light yield of the BTL modules.
 CREATE TABLE btl_qa (
     key                 bigserial PRIMARY KEY,
@@ -11,7 +16,20 @@ CREATE TABLE btl_qa (
     barcode             bigint NOT NULL,
     voltage             real NOT NULL,
     ch_511              real[],
+    avg_pulse_x         real[],
+    avg_pulse_y         real[],
     institution         inst DEFAULT 'Caltech'::inst NOT NULL
+    git_sha1            text,
+    git_dirty           integer,
+);
+
+-- Table to keep track of the light yield of the BTL modules.
+CREATE TABLE modules (
+    barcode             bigint PRIMARY KEY,
+    timestamp           timestamp with time zone default now(),
+    sipm                sipm_type NOT NULL,
+    institution         inst DEFAULT 'Caltech'::inst NOT NULL
+    comments            text,
 );
 
 -- create btl admin user
