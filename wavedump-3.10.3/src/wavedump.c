@@ -1261,7 +1261,7 @@ int add_to_output_file(char *filename, float data[WF_SIZE][32][1024], int n, int
     char dset_name[256];
     hsize_t start[2], count[2];
     int i, j, k;
-    unsigned int flags, filter_info;
+    unsigned int filter_info;
     hid_t aid, attr;
 
     chunk[0] = 100;
@@ -1547,10 +1547,9 @@ int main(int argc, char *argv[])
     char *output_filename = NULL;
     int nevents = 100;
     int total_events = 0;
-    int chunk = 10;
     double voltage = -1;
     int barcode = 0;
-    uint32_t address, data;
+    uint32_t data;
 
     CAEN_DGTZ_X742_EVENT_t *Event742 = NULL;
 
@@ -1655,8 +1654,6 @@ int main(int argc, char *argv[])
             nevents = atoi(argv[++i]);
         } else if (!strcmp(argv[i],"-o") && i < argc - 1) {
             output_filename = argv[++i];
-        } else if (!strcmp(argv[i],"-c") && i < argc - 1) {
-            chunk = atoi(argv[++i]);
         } else if (!strcmp(argv[i],"--help")) {
             print_help();
         } else if (!strcmp(argv[i],"-b") || !strcmp(argv[i],"--barcode")) {
