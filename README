@@ -4,16 +4,16 @@ Installation
 These installation instructions have only been tested on Fedora 34, but they
 should work on any recent Fedora, RHEL, CentOS, or Rocky Linux version.
 
-First, you should install hdf5, numpy, root, and pyroot with either:
+First, you should install hdf5, numpy, psycopg2, root, and pyroot with either:
 
 ```
-$ sudo dnf install hdf5 hdf5-devel python3-numpy root python3-root
+$ sudo dnf install hdf5 hdf5-devel python3-numpy python3-psycopg2 root python3-root
 ```
 
 or
 
 ```
-$ sudo yum install hdf5 hdf5-devel python3-numpy root python3-root
+$ sudo yum install hdf5 hdf5-devel python3-numpy python3-psycopg2 root python3-root
 ```
 
 Then, install the dependencies
