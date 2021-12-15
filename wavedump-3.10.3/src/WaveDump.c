@@ -1580,6 +1580,7 @@ int main(int argc, char *argv[])
     int chunk = 10;
     double voltage = -1;
     int barcode = 0;
+    uint32_t address, data;
 
     CAEN_DGTZ_X742_EVENT_t *Event742 = NULL;
 
@@ -1707,7 +1708,7 @@ int main(int argc, char *argv[])
         f_ini = fopen(config_filename, "r");
         if (f_ini == NULL) {
             fprintf(stderr, "couldn't find configuration file '%s'\n", config_filename);
-            goto QuitProgram;
+            exit(1);
         }
         memset(&WDcfg, 0, sizeof(WDcfg));
         ParseConfigFile(f_ini, &WDcfg);
@@ -1722,16 +1723,16 @@ int main(int argc, char *argv[])
 
     if (ret) {
         fprintf(stderr, "unable to open digitizer! Is it turned on?\n");
-        goto QuitProgram;
+        exit(1);
     }
 
     ret = CAEN_DGTZ_GetInfo(handle, &BoardInfo);
 
     if (ret) {
         fprintf(stderr, "unable to get board info.\n");
-        ErrCode = ERR_BOARD_INFO_READ;
-        goto QuitProgram;
+        exit(1);
     }
+
     printf("Connected to CAEN Digitizer Model %s\n", BoardInfo.ModelName);
     printf("ROC FPGA Release is %s\n", BoardInfo.ROC_FirmwareRel);
     printf("AMC FPGA Release is %s\n", BoardInfo.AMC_FirmwareRel);
@@ -1739,23 +1740,24 @@ int main(int argc, char *argv[])
     /* Check firmware rivision (DPP firmwares cannot be used with WaveDump) */
     sscanf(BoardInfo.AMC_FirmwareRel, "%d", &MajorNumber);
     if (MajorNumber >= 128) {
-        printf("This digitizer has a DPP firmware\n");
-        ErrCode = ERR_INVALID_BOARD_TYPE;
-        goto QuitProgram;
+        printf("This digitizer has a DPP firmware! quitting...\n");
+        exit(1);
     }
 
     /* Get Number of Channels, Number of bits, Number of Groups of the board */
     ret = GetMoreBoardInfo(handle, BoardInfo, &WDcfg);
+
     if (ret) {
-        ErrCode = ERR_INVALID_BOARD_TYPE;
-        goto QuitProgram;
+        fprintf(stderr, "invalid board type\n");
+        exit(1);
     }
 
     /* Check for possible board internal errors */
     ret = CheckBoardFailureStatus(handle, BoardInfo);
+
     if (ret) {
-        ErrCode = ERR_BOARD_FAILURE;
-        goto QuitProgram;
+        fprintf(stderr, "CheckBoardFailureStatus() returned 1\n");
+        exit(1);
     }
 
     //set default DAC calibration coefficients
@@ -1798,18 +1800,20 @@ Restart:
 
     /* program the digitizer */
     ret = ProgramDigitizer(handle, WDcfg, BoardInfo);
+
     if (ret) {
-        ErrCode = ERR_DGZ_PROGRAM;
-        goto QuitProgram;
+        fprintf(stderr, "error calling ProgramDigitizer()\n");
+        exit(1);
     }
 
     usleep(300000);
 
     //check for possible failures after programming the digitizer
     ret = CheckBoardFailureStatus(handle, BoardInfo);
+
     if (ret) {
-            ErrCode = ERR_BOARD_FAILURE;
-            goto QuitProgram;
+        fprintf(stderr, "error calling CheckBoardFailureStatus()\n");
+        exit(1);
     }
 
     // Select the next enabled group for plotting
@@ -1901,15 +1905,19 @@ Restart:
 
     CAEN_DGTZ_SWStopAcquisition(handle);
 
-    printf("setting mode to transparent mode\n");
-    uint32_t address, data;
-    ret = 0;
+    /* First, in order to self-trigger we need to set the digitizer into
+     * transparent mode and read some data from the board to get an idea of the
+     * un-calibrated baseline.
+     *
+     * See page 35 of the DT5742 manual. */
+
+    /* First, we get the register value of 0x8000, and then set the 13th bit to
+     * set it in transparent mode. */
     ret = CAEN_DGTZ_ReadRegister(handle, 0x8000, &data);
 
     if (ret) {
-        printf("ret = %i\n", ret);
         fprintf(stderr, "failed to read register 0x8000!\n");
-        goto QuitProgram;
+        exit(1);
     }
 
     data |= 1 << 13;
@@ -1918,14 +1926,13 @@ Restart:
 
     if (ret) {
         fprintf(stderr, "failed to write register 0x8000!\n");
-        goto QuitProgram;
+        exit(1);
     }
 
-    printf("starting acquisition\n");
+    /* Now, we take some data. */
     CAEN_DGTZ_SWStartAcquisition(handle);
 
     for (i = 0; i < 10; i++) {
-        printf("sending sw trigger\n");
         CAEN_DGTZ_SendSWtrigger(handle);
         usleep(1000);
     }
@@ -1936,20 +1943,22 @@ Restart:
     CAEN_DGTZ_SWStopAcquisition(handle);
 
     if (ret) {
-        ErrCode = ERR_READOUT;
-        goto QuitProgram;
+        fprintf(stderr, "error reading data in transparent mode!\n");
+        exit(1);
     }
 
     NumEvents = 0;
     if (BufferSize != 0) {
         ret = CAEN_DGTZ_GetNumEvents(handle, buffer, BufferSize, &NumEvents);
-        if (ret) {
-            ErrCode = ERR_READOUT;
-            goto QuitProgram;
-        }
-    }
 
-    printf("got %i events\n", NumEvents);
+        if (ret) {
+            fprintf(stderr, "error calling CAEN_DGTZ_GetNumEvents()!\n");
+            exit(1);
+        }
+    } else {
+        fprintf(stderr, "error: didn't get any events when in transparent mode! quitting...\n");
+        exit(1);
+    }
 
     static float wfdata[1000][32][1024];
     float baselines[32];
@@ -1959,33 +1968,35 @@ Restart:
     int nsamples = 0;
 
     /* Analyze data */
-    for(i = 0; i < (int)NumEvents; i++) {
+    for(i = 0; i < NumEvents; i++) {
         /* Get one event from the readout buffer */
         ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
+
         if (ret) {
-            ErrCode = ERR_EVENT_BUILD;
-            goto QuitProgram;
+            fprintf(stderr, "error calling CAEN_DGTZ_GetEventInfo()!\n");
+            exit(1);
         }
 
         ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
 
         if (ret) {
-            ErrCode = ERR_EVENT_BUILD;
-            goto QuitProgram;
+            fprintf(stderr, "error calling CAEN_DGTZ_DecodeEvent()!\n");
+            exit(1);
         }
 
         for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
             if (Event742->GrPresent[gr]) {
                 for (ch = 0; ch < 8; ch++) {
                     int Size = Event742->DataGroup[gr].ChSize[ch];
-                    if (Size <= 0) {
+
+                    if (Size <= 0)
                         continue;
-                    }
 
                     nsamples = Size;
 
                     chmask |= 1 << (gr*8 + ch);
-                    for(int j = 0; j < Size; j++) {
+
+                    for (int j = 0; j < Size; j++) {
                         wfdata[i][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                     }
                 }
@@ -1995,22 +2006,24 @@ Restart:
 
     get_baselines(wfdata, baselines, NumEvents, chmask, nsamples);
 
+    printf("Baselines for channels:\n");
     for (i = 0; i < 32; i++)
-        printf("baselines[%i] = %f\n", i, baselines[i]);
+        printf("    ch %2i = %.0f\n", i, baselines[i]);
 
     for (i = 0; i < 2; i++)
         thresholds[i] = 1e99;
 
+    /* Since we have to set the threshold for the whole group, we set the
+     * threshold to the minimum baseline for all channels within a group. */
     for (i = 0; i < 32; i++) {
         if (chmask & (1 << i)) {
-            printf("baseline for ch %i is %f\n", i, baselines[i]);
-
             if (baselines[i] < thresholds[i/8])
                 thresholds[i/8] = baselines[i];
         }
     }
 
     for (i = 0; i < 2; i++) {
+        /* Subtract 50 from the minimum baseline to get the threshold. */
         thresholds[i] -= 50;
 
         if (thresholds[i] < 1e99) {
@@ -2019,7 +2032,7 @@ Restart:
 
             if (ret) {
                 fprintf(stderr, "failed to write register 0x%04x!\n", 0x1080 + 256*i);
-                goto QuitProgram;
+                exit(1);
             }
 
             printf("setting channel mask for group %i to 0x%02x\n", i, (int) (chmask >> i*16) & 0xff);
@@ -2027,26 +2040,24 @@ Restart:
 
             if (ret) {
                 fprintf(stderr, "failed to write register 0x%04x!\n", 0x10A8 + 256*i);
-                goto QuitProgram;
+                exit(1);
             }
         } else {
             ret = CAEN_DGTZ_WriteRegister(handle, 0x10A8 + 256*i, 0);
 
             if (ret) {
                 fprintf(stderr, "failed to write register 0x%04x!\n", 0x10A8 + 256*i);
-                goto QuitProgram;
+                exit(1);
             }
         }
     }
 
-    printf("setting mode to output mode\n");
-    ret = 0;
+    /* Now, we switch back to output mode. */
     ret = CAEN_DGTZ_ReadRegister(handle, 0x8000, &data);
 
     if (ret) {
-        printf("ret = %i\n", ret);
         fprintf(stderr, "failed to read register 0x8000!\n");
-        goto QuitProgram;
+        exit(1);
     }
 
     data &= ~(1 << 13);
@@ -2055,31 +2066,35 @@ Restart:
 
     if (ret) {
         fprintf(stderr, "failed to write register 0x8000!\n");
-        goto QuitProgram;
+        exit(1);
     }
 
     CAEN_DGTZ_SWStartAcquisition(handle);
 
+    /* Now, we go into the main loop where we get events. */
+
     int nread = 0;
 
     while (!stop && total_events < nevents) {
-        /* Read data from the board */
+        /* FIXME: Here, we send software triggers just for testing the
+         * software. In production, this line should be commented out. */
         printf("sending sw trigger\n");
 	CAEN_DGTZ_SendSWtrigger(handle);
 
         ret = CAEN_DGTZ_ReadData(handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, buffer, &BufferSize);
 
         if (ret) {
-            ErrCode = ERR_READOUT;
-            goto QuitProgram;
+            fprintf(stderr, "error calling CAEN_DGTZ_ReadData()!\n");
+            exit(1);
         }
 
         NumEvents = 0;
         if (BufferSize != 0) {
             ret = CAEN_DGTZ_GetNumEvents(handle, buffer, BufferSize, &NumEvents);
+
             if (ret) {
-                ErrCode = ERR_READOUT;
-                goto QuitProgram;
+                fprintf(stderr, "error calling CAEN_DGTZ_GetNumEvents()!\n");
+                exit(1);
             }
         }
 
@@ -2090,30 +2105,32 @@ Restart:
         for (i = 0; i < (int)NumEvents; i++) {
             /* Get one event from the readout buffer */
             ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
+
             if (ret) {
-                ErrCode = ERR_EVENT_BUILD;
-                goto QuitProgram;
+                fprintf(stderr, "error calling CAEN_DGTZ_GetEventInfo()!\n");
+                exit(1);
             }
 
             ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
 
             if (ret) {
-                ErrCode = ERR_EVENT_BUILD;
-                goto QuitProgram;
+                fprintf(stderr, "error calling CAEN_DGTZ_DecodeEvent()!\n");
+                exit(1);
             }
 
             for (int gr = 0; gr < (WDcfg.Nch/8); gr++) {
                 if (Event742->GrPresent[gr]) {
                     for (ch = 0; ch < 8; ch++) {
                         int Size = Event742->DataGroup[gr].ChSize[ch];
-                        if (Size <= 0) {
+
+                        if (Size <= 0)
                             continue;
-                        }
 
                         nsamples = Size;
 
                         chmask |= 1 << (gr*8 + ch);
-                        for(int j = 0; j < Size; j++) {
+
+                        for (int j = 0; j < Size; j++) {
                             wfdata[nread][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
                         }
                     }
@@ -2122,12 +2139,14 @@ Restart:
             nread += 1;
         }
 
-        printf("writing %i events to file\n", nread);
         if (nread > 0) {
+            printf("writing %i events to file\n", nread);
             if (add_to_output_file(output_filename, wfdata, nread, chmask, nsamples, &WDcfg)) {
-                goto QuitProgram;
+                fprintf(stderr, "failed to write events to file! quitting...\n");
+                exit(1);
             }
         }
+
         total_events += nread;
 
         usleep(100000);
@@ -2137,12 +2156,14 @@ Restart:
         fprintf(stderr, "ctrl-c caught. writing out %i events\n", nread);
 
     if (nread > 0 && add_to_output_file(output_filename, wfdata, nread, chmask, nsamples, &WDcfg)) {
-        goto QuitProgram;
+        fprintf(stderr, "failed to write events to file!\n");
     }
 
     CAEN_DGTZ_SWStopAcquisition(handle);
 
-    QuitProgram:
-
     return 0;
+
+QuitProgram:
+
+    return 1;
 }
