@@ -140,6 +140,8 @@ typedef struct {
     int StartupCalibration;
 	DAC_Calibration_data DAC_Calib;
     char ipAddress[25];
+    int barcode;
+    float voltage;
 } WaveDumpConfig_t;
 
 

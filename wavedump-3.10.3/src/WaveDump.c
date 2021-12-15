@@ -1252,6 +1252,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
     hsize_t start[2], count[2];
     int i, j, k;
     unsigned int flags, filter_info;
+    hid_t aid, attr;
 
     chunk[0] = 100;
     chunk[1] = 1024;
@@ -1281,29 +1282,34 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         /* Create a new file using the default properties. */
         file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-        hid_t aid2, aid3, aid4, attr2, attr3, attr4;
-        aid2  = H5Screate(H5S_SCALAR);
-        attr2 = H5Acreate2(file, "record_length", H5T_NATIVE_INT, aid2, H5P_DEFAULT, H5P_DEFAULT);
+        aid  = H5Screate(H5S_SCALAR);
+        attr = H5Acreate2(file, "record_length", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int record_length = WDcfg->RecordLength;
-        int ret = H5Awrite(attr2, H5T_NATIVE_INT, &record_length);
+        int ret = H5Awrite(attr, H5T_NATIVE_INT, &record_length);
 
         if (ret) {
             fprintf(stderr, "failed to write record length to hdf5 file.\n");
             return 1;
         }
 
-        aid3  = H5Screate(H5S_SCALAR);
-        attr3 = H5Acreate2(file, "post_trigger", H5T_NATIVE_INT, aid3, H5P_DEFAULT, H5P_DEFAULT);
+        H5Sclose(aid);
+        H5Aclose(attr);
+
+        aid  = H5Screate(H5S_SCALAR);
+        attr = H5Acreate2(file, "post_trigger", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int post_trigger = WDcfg->PostTrigger;
-        ret = H5Awrite(attr3, H5T_NATIVE_INT, &post_trigger);
+        ret = H5Awrite(attr, H5T_NATIVE_INT, &post_trigger);
 
         if (ret) {
             fprintf(stderr, "failed to write post trigger to hdf5 file.\n");
             return 1;
         }
 
-        aid4  = H5Screate(H5S_SCALAR);
-        attr4 = H5Acreate2(file, "drs4_frequency", H5T_NATIVE_INT, aid4, H5P_DEFAULT, H5P_DEFAULT);
+        H5Sclose(aid);
+        H5Aclose(attr);
+
+        aid  = H5Screate(H5S_SCALAR);
+        attr = H5Acreate2(file, "drs4_frequency", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int drs4_frequency = 0;
         switch (WDcfg->DRS4Frequency) {
         case 0:
@@ -1322,19 +1328,39 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
             fprintf(stderr, "unknown DRS4 frequency %i\n", WDcfg->DRS4Frequency);
             return 1;
         }
-        ret = H5Awrite(attr4, H5T_NATIVE_INT, &drs4_frequency);
+        ret = H5Awrite(attr, H5T_NATIVE_INT, &drs4_frequency);
 
         if (ret) {
             fprintf(stderr, "failed to write DRS4 frequency to hdf5 file.\n");
             return 1;
         }
 
-        H5Sclose(aid2);
-        H5Aclose(attr2);
-        H5Sclose(aid3);
-        H5Aclose(attr3);
-        H5Sclose(aid4);
-        H5Aclose(attr4);
+        H5Sclose(aid);
+        H5Aclose(attr);
+
+        aid  = H5Screate(H5S_SCALAR);
+        attr = H5Acreate2(file, "barcode", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
+        ret = H5Awrite(attr, H5T_NATIVE_INT, &WDcfg->barcode);
+
+        if (ret) {
+            fprintf(stderr, "failed to write barcode to hdf5 file.\n");
+            return 1;
+        }
+
+        H5Sclose(aid);
+        H5Aclose(attr);
+
+        aid  = H5Screate(H5S_SCALAR);
+        attr = H5Acreate2(file, "voltage", H5T_NATIVE_FLOAT, aid, H5P_DEFAULT, H5P_DEFAULT);
+        ret = H5Awrite(attr, H5T_NATIVE_FLOAT, &WDcfg->voltage);
+
+        if (ret) {
+            fprintf(stderr, "failed to write voltage to hdf5 file.\n");
+            return 1;
+        }
+
+        H5Sclose(aid);
+        H5Aclose(attr);
 
         for (i = 0; i < 32; i++) {
             if (!(chmask & (1 << i))) continue;
@@ -1687,6 +1713,9 @@ int main(int argc, char *argv[])
         ParseConfigFile(f_ini, &WDcfg);
         fclose(f_ini);
     }
+
+    WDcfg.voltage = voltage;
+    WDcfg.barcode = barcode;
 
     /* Open the digitizer. */
     ret = CAEN_DGTZ_OpenDigitizer(0, 0, 0, 0, &handle);

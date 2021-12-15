@@ -71,50 +71,48 @@ if __name__ == '__main__':
     import sys
 
     parser = ArgumentParser(description='Analyze data from the Agilent scope')
-    parser.add_argument('filenames',nargs='+',help='input filenames (hdf5 format)')
+    parser.add_argument('filename',help='input filename (hdf5 format)')
     parser.add_argument('-o','--output', default=None, help='output file name', required=True)
     parser.add_argument('--plot', default=False, action='store_true', help='plot the waveforms and charge integral')
-    parser.add_argument('-b','--barcode', type=int, default=None, required=True, help='barcode of the module')
-    parser.add_argument('-v','--voltage', type=float, default=None, required=True, help='voltage')
     parser.add_argument('-u','--upload', default=False, action='store_true', help='upload results to the database')
     args = parser.parse_args()
 
+    data = {}
+    data['ch_511'] = []
+
     charge = {}
-    for filename in args.filenames:
-        with h5py.File(filename) as f:
-            x = np.linspace(0,f.attrs['record_length']*1e3/f.attrs['drs4_frequency'],f.attrs['record_length'])
-            for i in range(16):
-                channel = 'ch%i' % i
+    with h5py.File(args.filename) as f:
+        data['barcode'] = int(f.attrs['barcode'])
+        data['voltage'] = int(f.attrs['voltage'])
 
-                if channel not in f:
-                    print("failed to find channel %i" % i)
-                    continue
+        x = np.linspace(0,f.attrs['record_length']*1e3/f.attrs['drs4_frequency'],f.attrs['record_length'])
+        for i in range(16):
+            channel = 'ch%i' % i
 
-                y = f[channel][:]*2/0xfff
+            if channel not in f:
+                print("failed to find channel %i" % i)
+                continue
 
-                # Remove baseline
-                y -= np.median(y[:,:100],axis=-1)[:,np.newaxis]
+            y = f[channel][:]*2/0xfff
 
-                a, b = get_window(x,y,left=20,right=400)
-                
-                charge[channel] = integrate(x,y, a, b)
-                
-                if args.plot:
-                    plt.subplot(4,4,i+1)
-                    plt.plot(x,y[:100].T)
-                    plt.xlabel("Time (ns)")
-                    plt.ylabel("Voltage (V)")
-                    plt.title(channel)
-                    plt.axvline(x[a])
-                    plt.axvline(x[b])
+            # Remove baseline
+            y -= np.median(y[:,:100],axis=-1)[:,np.newaxis]
+
+            a, b = get_window(x,y,left=20,right=400)
+            
+            charge[channel] = integrate(x,y, a, b)
+            
+            if args.plot:
+                plt.subplot(4,4,i+1)
+                plt.plot(x,y[:100].T)
+                plt.xlabel("Time (ns)")
+                plt.ylabel("Voltage (V)")
+                plt.title(channel)
+                plt.axvline(x[a])
+                plt.axvline(x[b])
 
     if args.plot:
         plt.figure()
-
-    data = {}
-    data['ch_511'] = []
-    data['barcode'] = args.barcode
-    data['voltage'] = args.voltage
 
     f = ROOT.TFile(args.output,"recreate")
     for i in range(16):
