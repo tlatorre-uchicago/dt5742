@@ -71,31 +71,6 @@ static char ErrMsg[ERR_DUMMY_LAST][100] = {
 
 static CAEN_DGTZ_IRQMode_t INTERRUPT_MODE = CAEN_DGTZ_IRQ_MODE_ROAK;
 
-/* ###########################################################################
-*  Functions
-*  ########################################################################### */
-/*! \fn      static long get_time()
-*   \brief   Get time in milliseconds
-*
-*   \return  time in msec
-*/
-static long get_time()
-{
-    long time_ms;
-#ifdef WIN32
-    struct _timeb timebuffer;
-    _ftime( &timebuffer );
-    time_ms = (long)timebuffer.time * 1000 + (long)timebuffer.millitm;
-#else
-    struct timeval t1;
-    struct timezone tz;
-    gettimeofday(&t1, &tz);
-    time_ms = (t1.tv_sec) * 1000 + t1.tv_usec / 1000;
-#endif
-    return time_ms;
-}
-
-
 /*! \fn      int GetMoreBoardNumChannels(CAEN_DGTZ_BoardInfo_t BoardInfo,  WaveDumpConfig_t *WDcfg)
 *   \brief   calculate num of channels, num of bit and sampl period according to the board type
 *
@@ -1537,7 +1512,7 @@ int main(int argc, char *argv[])
     uint32_t AllocatedSize, BufferSize, NumEvents;
     char *buffer = NULL;
     char *EventPtr = NULL;
-    int isVMEDevice= 0, MajorNumber;
+    int MajorNumber;
     CAEN_DGTZ_BoardInfo_t BoardInfo;
     CAEN_DGTZ_EventInfo_t EventInfo;
     char *config_filename = NULL;
@@ -1574,9 +1549,9 @@ int main(int argc, char *argv[])
 
     /* Disable test pattern. */
     WDcfg.TestPattern = 0;
-    CAEN_DGTZ_EnaDis_t DesMode;
+    //CAEN_DGTZ_EnaDis_t DesMode;
     //int TriggerEdge;
-    CAEN_DGTZ_IOLevel_t FPIOtype;
+    //CAEN_DGTZ_IOLevel_t FPIOtype;
 
     /* Set to enable external triggers, so we can trigger on the laser if we
      * want. */
@@ -1584,8 +1559,6 @@ int main(int argc, char *argv[])
 
     /* Enable all channels. */
     WDcfg.EnableMask = 0xFF;
-
-    CAEN_DGTZ_TriggerMode_t ChannelTriggerMode[MAX_SET];
 
     /* Set to trigger on negative pulses. */
     for (i = 0; i < MAX_SET; i++)
@@ -1738,7 +1711,6 @@ int main(int argc, char *argv[])
     if (WDcfg.StartupCalibration)
         calibrate(handle, &WDrun, BoardInfo);
 
-Restart:
     // mask the channels not available for this model
     if ((BoardInfo.FamilyCode != CAEN_DGTZ_XX740_FAMILY_CODE) && (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)){
         WDcfg.EnableMask &= (1<<WDcfg.Nch)-1;
