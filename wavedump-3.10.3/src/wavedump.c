@@ -1,5 +1,5 @@
 #include <CAENDigitizer.h>
-#include "WaveDump.h"
+#include "wavedump.h"
 #include "WDconfig.h"
 #include "WDplot.h"
 #include "fft.h"
