@@ -1482,7 +1482,11 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
 
 void print_help()
 {
-    fprintf(stderr, "usage: wavedump -o [OUTPUT] -n [NUMBER] CONFIG_FILE\n");
+    fprintf(stderr, "usage: wavedump -o [OUTPUT] -n [NUMBER] [CONFIG_FILE]\n"
+    "  -b, --barcode <barcode>    Barcode of the module being tested\n"
+    "  -v, --voltage <voltage>    Voltage (V)"
+    "  --help                     Output this help and exit.\n"
+    "\n");
     exit(1);
 }
 
@@ -1548,6 +1552,8 @@ int main(int argc, char *argv[])
     int nevents = 100;
     int total_events = 0;
     int chunk = 10;
+    double voltage = -1;
+    int barcode = 0;
 
     CAEN_DGTZ_X742_EVENT_t *Event742 = NULL;
 
@@ -1654,14 +1660,18 @@ int main(int argc, char *argv[])
             output_filename = argv[++i];
         } else if (!strcmp(argv[i],"-c") && i < argc - 1) {
             chunk = atoi(argv[++i]);
-        } else if (!strcmp(argv[i],"-h")) {
+        } else if (!strcmp(argv[i],"--help")) {
             print_help();
+        } else if (!strcmp(argv[i],"-b") || !strcmp(argv[i],"--barcode")) {
+            barcode = atoi(argv[++i]);
+        } else if (!strcmp(argv[i],"-v") || !strcmp(argv[i],"--voltage")) {
+            voltage = atof(argv[++i]);
         } else {
             config_filename = argv[i];
         }
     }
 
-    if (!output_filename)
+    if (!output_filename || barcode == 0 || voltage < 0)
         print_help();
 
     signal(SIGINT, sigint_handler);
