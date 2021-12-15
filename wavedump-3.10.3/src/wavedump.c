@@ -1938,7 +1938,7 @@ Restart:
     int nsamples = 0;
 
     if (NumEvents > WF_SIZE)
-        NumEvents = WF_SIZE
+        NumEvents = WF_SIZE;
 
     /* Analyze data */
     for(i = 0; i < NumEvents; i++) {
@@ -2072,7 +2072,7 @@ Restart:
         }
 
         if (NumEvents > WF_SIZE)
-            NumEvents = WF_SIZE
+            NumEvents = WF_SIZE;
 
         printf("got %i events\n", NumEvents);
 
