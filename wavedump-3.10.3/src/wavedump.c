@@ -1362,6 +1362,8 @@ int add_to_output_file(char *filename, float data[WF_SIZE][32][1024], int n, int
             return 1;
         }
 
+        printf("git sha1 = %s\n", GitSHA1());
+
         H5Sclose(aid);
         H5Aclose(attr);
         H5Tclose(atype);

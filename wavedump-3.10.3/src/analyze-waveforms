@@ -110,8 +110,8 @@ if __name__ == '__main__':
     with h5py.File(args.filename) as f:
         data['barcode'] = int(f.attrs['barcode'])
         data['voltage'] = int(f.attrs['voltage'])
-        data['git_sha1'] = f.attrs['git_sha1']
-        data['git_dirty'] = f.attrs['git_dirty']
+        data['git_sha1'] = f.attrs['git_sha1'].decode("UTF-8")
+        data['git_dirty'] = f.attrs['git_dirty'].decode("UTF-8")
 
         x = np.linspace(0,f.attrs['record_length']*1e3/f.attrs['drs4_frequency'],f.attrs['record_length'])
         for i in range(16):
