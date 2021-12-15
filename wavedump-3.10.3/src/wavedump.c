@@ -1216,7 +1216,7 @@ int Set_calibrated_DCO(int handle, int ch, WaveDumpConfig_t *WDcfg, CAEN_DGTZ_Bo
 	return ret;
 }
 
-void get_baselines(float data[1000][32][1024], float *baselines, int n, int chmask, int nsamples)
+void get_baselines(float data[10000][32][1024], float *baselines, int n, int chmask, int nsamples)
 {
     int i, j, k;
 
@@ -1249,7 +1249,7 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
  * off. The reason is that with the full compression (gzip level 9), it was too
  * slow and so the data taking time was dominated by the compression. There is
  * probably some way to speed this up, and if so, it can be re-enabled. */
-int add_to_output_file(char *filename, float data[1000][32][1024], int n, int chmask, int nsamples, WaveDumpConfig_t *WDcfg)
+int add_to_output_file(char *filename, float data[10000][32][1024], int n, int chmask, int nsamples, WaveDumpConfig_t *WDcfg)
 {
     hid_t file, space, dset, dcpl, mem_space, file_space;
     herr_t status;
@@ -1928,7 +1928,7 @@ Restart:
         exit(1);
     }
 
-    static float wfdata[1000][32][1024];
+    static float wfdata[10000][32][1024];
     float baselines[32];
     float thresholds[2];
 
@@ -2070,7 +2070,7 @@ Restart:
 
         /* Analyze data */
         nread = 0;
-        for (i = 0; i < (int)NumEvents; i++) {
+        for (i = 0; i < NumEvents; i++) {
             /* Get one event from the readout buffer */
             ret = CAEN_DGTZ_GetEventInfo(handle, buffer, BufferSize, i, &EventInfo, &EventPtr);
 
