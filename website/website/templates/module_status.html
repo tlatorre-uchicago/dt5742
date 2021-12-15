@@ -42,6 +42,9 @@
 	<div class="row">
 	    <div class="col-md-12" id='ch-511'></div>
         </div>
+	<div class="row">
+	    <div class="col-md-12" id='avg-pulse'></div>
+        </div>
 	{% endif %}
     </div>
 {% endblock %}
@@ -52,11 +55,19 @@
 
     <script>
         var ch_511 = {{ info['ch_511'] | tojson }};
+        var avg_pulse_x = {{ info['avg_pulse_x'] | tojson }};
+        var avg_pulse_y = {{ info['avg_pulse_y'] | tojson }};
 
         var ch_511_data = new Array();
         for (var i=0; i < ch_511.length; i++) {
             if (ch_511[i] !== null)
                 ch_511_data.push({'x': i, 'y': ch_511[i]});
+        }
+
+        var avg_pulse_data = new Array();
+        for (var i=0; i < avg_pulse_x.length; i++) {
+            if (avg_pulse_y[i] !== null)
+                avg_pulse_data.push({'x': avg_pulse_x[i], 'y': avg_pulse_y[i]});
         }
 
         MG.data_graphic({
@@ -72,6 +83,21 @@
             y_accessor: 'y',
             x_label: 'Channel',
             y_label: 'Charge (pC)'
+        });
+
+        MG.data_graphic({
+            title: "Average Pulse Shape",
+            description: "Average Pulse Shape",
+            data: avg_pulse_data,
+            chart_type: 'line',
+            width: $('#avg-pulse').width(),
+            height: 250,
+            left: 100,
+            target: '#avg-pulse',
+            x_accessor: 'x',
+            y_accessor: 'y',
+            x_label: 'Time (ns)',
+            y_label: 'Voltage (V)'
         });
     </script>
 {% endblock %}
