@@ -1528,21 +1528,18 @@ void print_help()
 
 int main(int argc, char *argv[])
 {
-    WaveDumpConfig_t   WDcfg;
-    WaveDumpRun_t      WDrun;
+    WaveDumpConfig_t WDcfg;
+    WaveDumpRun_t WDrun;
     CAEN_DGTZ_ErrorCode ret = CAEN_DGTZ_Success;
-    int  handle = -1;
-    ERROR_CODES ErrCode= ERR_NONE;
-    int i, j, ch, Nb=0, Ne=0;
+    int handle = -1;
+    ERROR_CODES ErrCode = ERR_NONE;
+    int i, j, ch;
     uint32_t AllocatedSize, BufferSize, NumEvents;
     char *buffer = NULL;
     char *EventPtr = NULL;
-    char ConfigFileName[100];
     int isVMEDevice= 0, MajorNumber;
-    uint64_t CurrentTime, PrevRateTime, ElapsedTime;
-    int nCycles= 0;
-    CAEN_DGTZ_BoardInfo_t       BoardInfo;
-    CAEN_DGTZ_EventInfo_t       EventInfo;
+    CAEN_DGTZ_BoardInfo_t BoardInfo;
+    CAEN_DGTZ_EventInfo_t EventInfo;
     char *config_filename = NULL;
     char *output_filename = NULL;
     int nevents = 100;
@@ -1857,18 +1854,7 @@ Restart:
         goto QuitProgram;
     }
 
-    if (WDrun.Restart && WDrun.AcqRun) {
-        usleep(300000);
-
-        if (BoardInfo.FamilyCode != CAEN_DGTZ_XX742_FAMILY_CODE)//XX742 not considered
-            Set_relative_Threshold(handle, &WDcfg, BoardInfo);
-
-        CAEN_DGTZ_SWStartAcquisition(handle);
-    } else {
-        printf("[s] start/stop the acquisition, [q] quit, [SPACE] help\n");
-    }
-    WDrun.Restart = 0;
-    PrevRateTime = get_time();
+    usleep(300000);
 
     CAEN_DGTZ_SWStopAcquisition(handle);
 
