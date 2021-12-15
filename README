@@ -4,16 +4,16 @@ Installation
 These installation instructions have only been tested on Fedora 34, but they
 should work on any recent Fedora, RHEL, CentOS, or Rocky Linux version.
 
-First, you should install gnuplot with either:
+First, you should install hdf5 with either:
 
 ```
-$ sudo dnf install gnuplot
+$ sudo dnf install hdf5 hdf5-devel
 ```
 
 or
 
 ```
-$ sudo yum install gnuplot
+$ sudo yum install hdf5 hdf5-devel
 ```
 
 Then, install the dependencies
@@ -26,6 +26,7 @@ Finally, you can build the wavedump program:
 
 ```
 $ make
+$ sudo make install
 ```
 
 Running
@@ -34,6 +35,31 @@ Running
 You can run the wavedump software by running:
 
 ```
-$ cd wavedump-3.10.3
-$ ./src/wavedump WaveDumpConfig_X742.txt
+$ wavedump -b [barcode] -v [voltage] test.hdf5 -n 1000
+```
+
+Analyzing Results
+-----------------
+
+You can analyze the results by running:
+
+```
+$ analyze-waveforms test.hdf5 -o test.root --plot
+```
+
+Uploading Results
+-----------------
+
+First, you need to set an environment variable containing the password to the
+database, and ideally add it to your .bashrc:
+
+```
+$ echo 'export BTL_DB_PASSWORD=[PASSWORD]' >> .bashrc
+$ source .bashrc
+```
+
+You can analyze the results by running:
+
+```
+$ analyze-waveforms test.hdf5 -o test.root --upload
 ```
