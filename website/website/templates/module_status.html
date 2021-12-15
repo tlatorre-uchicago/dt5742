@@ -22,7 +22,7 @@
                 <table class="table table-bordered">
                     <tr>
                         <th>Date</th>
-                        <td>{{ info['timestamp'].strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        <td>{{ info['btl_qa_timestamp'].strftime("%Y-%m-%d %H:%M:%S") }}</td>
                     </tr>
                     <tr>
                         <th>Barcode</th>
@@ -34,7 +34,28 @@
                     </tr>
                     <tr>
                         <th>Institution</th>
-                        <td>{{ info['institution'] }}</td>
+                        <td>{{ info['btl_qa_institution'] }}</td>
+                    </tr>
+                </table>
+	    </div>
+	    <div class="col-md-2">
+                <h3>Module Info</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Date Added to Database</th>
+                        <td>{{ info['modules_timestamp'].strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                    </tr>
+                    <tr>
+                        <th>Barcode</th>
+                        <td>{{ info['barcode'] }}</td>
+                    </tr>
+                    <tr>
+                        <th>SiPM Type</th>
+                        <td>{{ info['sipm'] }}</td>
+                    </tr>
+                    <tr>
+                        <th>Assembly Institution</th>
+                        <td>{{ info['btl_qa_institution'] }}</td>
                     </tr>
                 </table>
 	    </div>

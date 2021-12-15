@@ -6,7 +6,7 @@ import psycopg2.extensions
 def get_module_info(key):
     conn = engine.connect()
 
-    query = "SELECT * FROM btl_qa WHERE key = %s"
+    query = "SELECT *, modules.institution as modules_institution, btl_qa.institution as btl_qa_institution, modules.timestamp as modules_timestamp, btl_qa.timestamp as btl_qa_timestamp FROM btl_qa, modules WHERE key = %s AND btl_qa.barcode = modules.barcode"
 
     result = conn.execute(query, (key,))
 
@@ -16,6 +16,8 @@ def get_module_info(key):
     keys = result.keys()
     row = result.fetchone()
 
+    print(keys)
+    print(dir(result))
     return dict(zip(keys,row))
 
 def get_modules(kwargs, limit=100, sort_by=None):
