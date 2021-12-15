@@ -1241,6 +1241,14 @@ void get_baselines(float data[1000][32][1024], float *baselines, int n, int chma
     }
 }
 
+/* Write events to an HDF5 output file. If the file doesn't exist, it will be
+ * created and attributes such as the record_length, post_trigger, barcode, and
+ * voltage will be written.
+ *
+ * The output file is set up to use gzip compression, but right now it's turned
+ * off. The reason is that with the full compression (gzip level 9), it was too
+ * slow and so the data taking time was dominated by the compression. There is
+ * probably some way to speed this up, and if so, it can be re-enabled. */
 int add_to_output_file(char *filename, float data[1000][32][1024], int n, int chmask, int nsamples, WaveDumpConfig_t *WDcfg)
 {
     hid_t file, space, dset, dcpl, mem_space, file_space;
@@ -1282,7 +1290,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         /* Create a new file using the default properties. */
         file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-        aid  = H5Screate(H5S_SCALAR);
+        aid = H5Screate(H5S_SCALAR);
         attr = H5Acreate2(file, "record_length", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int record_length = WDcfg->RecordLength;
         int ret = H5Awrite(attr, H5T_NATIVE_INT, &record_length);
@@ -1295,7 +1303,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         H5Sclose(aid);
         H5Aclose(attr);
 
-        aid  = H5Screate(H5S_SCALAR);
+        aid = H5Screate(H5S_SCALAR);
         attr = H5Acreate2(file, "post_trigger", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int post_trigger = WDcfg->PostTrigger;
         ret = H5Awrite(attr, H5T_NATIVE_INT, &post_trigger);
@@ -1308,7 +1316,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         H5Sclose(aid);
         H5Aclose(attr);
 
-        aid  = H5Screate(H5S_SCALAR);
+        aid = H5Screate(H5S_SCALAR);
         attr = H5Acreate2(file, "drs4_frequency", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         int drs4_frequency = 0;
         switch (WDcfg->DRS4Frequency) {
@@ -1338,7 +1346,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         H5Sclose(aid);
         H5Aclose(attr);
 
-        aid  = H5Screate(H5S_SCALAR);
+        aid = H5Screate(H5S_SCALAR);
         attr = H5Acreate2(file, "barcode", H5T_NATIVE_INT, aid, H5P_DEFAULT, H5P_DEFAULT);
         ret = H5Awrite(attr, H5T_NATIVE_INT, &WDcfg->barcode);
 
@@ -1350,7 +1358,7 @@ int add_to_output_file(char *filename, float data[1000][32][1024], int n, int ch
         H5Sclose(aid);
         H5Aclose(attr);
 
-        aid  = H5Screate(H5S_SCALAR);
+        aid = H5Screate(H5S_SCALAR);
         attr = H5Acreate2(file, "voltage", H5T_NATIVE_FLOAT, aid, H5P_DEFAULT, H5P_DEFAULT);
         ret = H5Awrite(attr, H5T_NATIVE_FLOAT, &WDcfg->voltage);
 
@@ -1516,46 +1524,6 @@ void print_help()
     exit(1);
 }
 
-static void set_default_configuration(WaveDumpConfig_t *WDcfg)
-{
-    int i, j;
-
-    WDcfg->RecordLength = (1024*16);
-    WDcfg->PostTrigger = 50;
-    WDcfg->NumEvents = 1023;
-    WDcfg->EnableMask = 0xFFFF;
-    WDcfg->GWn = 0;
-    WDcfg->ExtTriggerMode = CAEN_DGTZ_TRGMODE_ACQ_ONLY;
-    WDcfg->InterruptNumEvents = 0;
-    WDcfg->TestPattern = 0;
-    WDcfg->DecimationFactor = 1;
-    WDcfg->DesMode = 0;
-    WDcfg->FastTriggerMode = 0; 
-    WDcfg->FastTriggerEnabled = 0; 
-    WDcfg->FPIOtype = 0;
-
-    strcpy(WDcfg->GnuPlotPath, GNUPLOT_DEFAULT_PATH);
-    for (i = 0; i < MAX_SET; i++) {
-	WDcfg->PulsePolarity[i] = CAEN_DGTZ_PulsePolarityPositive;
-	WDcfg->Version_used[i] = 0;
-	WDcfg->DCoffset[i] = 0;
-	WDcfg->Threshold[i] = 0;
-        WDcfg->ChannelTriggerMode[i] = CAEN_DGTZ_TRGMODE_DISABLED;
-	WDcfg->GroupTrgEnableMask[i] = 0;
-	for (j = 0; j < MAX_SET; j++)
-            WDcfg->DCoffsetGrpCh[i][j] = -1;
-	WDcfg->FTThreshold[i] = 0;
-	WDcfg->FTDCoffset[i] =0;
-    }
-
-    WDcfg->useCorrections = -1;
-    WDcfg->UseManualTables = -1;
-    for (i = 0; i < MAX_X742_GROUP_SIZE; i++)
-        sprintf(WDcfg->TablesFilenames[i], "Tables_gr%d", i);
-    WDcfg->DRS4Frequency = CAEN_DGTZ_DRS4_5GHz;
-    WDcfg->StartupCalibration = 1;
-}
-
 int main(int argc, char *argv[])
 {
     WaveDumpConfig_t   WDcfg;
@@ -1592,7 +1560,7 @@ int main(int argc, char *argv[])
     memset(&WDrun, 0, sizeof(WDrun));
     memset(&WDcfg, 0, sizeof(WDcfg));
 
-    set_default_configuration(&WDcfg);
+    SetDefaultConfiguration(&WDcfg);
 
     WDcfg.LinkType = 0;
     WDcfg.LinkNum = 0;

@@ -24,6 +24,8 @@
 *  Functions
 *  ########################################################################### */
 
+void SetDefaultConfiguration(WaveDumpConfig_t *WDcfg);
+
 /*! \fn      int ParseConfigFile(FILE *f_ini, WaveDumpConfig_t *WDcfg) 
 *   \brief   Read the configuration file and set the WaveDump paremeters
 *            
