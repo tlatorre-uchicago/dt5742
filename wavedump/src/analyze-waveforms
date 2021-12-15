@@ -121,7 +121,9 @@ if __name__ == '__main__':
                 print("failed to find channel %i" % i)
                 continue
 
-            y = f[channel][:]*2/0xfff
+            # Skip the first 10 events since that's after we transition from
+            # transparent mode to output mode
+            y = f[channel][10:]*2/0xfff
 
             # Remove baseline
             y -= np.median(y[:,:100],axis=-1)[:,np.newaxis]
