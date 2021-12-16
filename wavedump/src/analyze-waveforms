@@ -135,10 +135,6 @@ if __name__ == '__main__':
             # Remove baseline
             y -= np.median(y[:,:100],axis=-1)[:,np.newaxis]
 
-            # FIXME: testing
-            from scipy.stats import norm
-            y -= norm.pdf(x,100,10)
-
             a, b = get_window(x,y,left=20,right=400)
             
             charge[channel] = integrate(x,y, a, b)
