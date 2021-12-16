@@ -1650,7 +1650,7 @@ int main(int argc, char *argv[])
      *   1 = 2.5 GHz
      *   2 = 1 GHz
      *   3 = 750 MHz */
-    WDcfg.DRS4Frequency = (CAEN_DGTZ_DRS4Frequency_t) 2;
+    WDcfg.DRS4Frequency = (CAEN_DGTZ_DRS4Frequency_t) 1;
 
     //int StartupCalibration;
     //DAC_Calibration_data DAC_Calib;
