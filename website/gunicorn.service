@@ -1,0 +1,12 @@
+[Unit]
+Description=gunicorn daemon
+After=network.target
+
+[Service]
+User=nginx
+Group=nginx
+WorkingDirectory=/opt/btl-testing
+ExecStart=gunicorn --workers 3 --bind unix:/tmp/gunicorn.sock btl-testing.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
