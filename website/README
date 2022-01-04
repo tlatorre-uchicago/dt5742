@@ -15,3 +15,12 @@ software is updated:
 ```console
 # dnf update -y
 ```
+
+Next, we install and enable the postgres server software:
+
+```console
+# dnf install postgresql postgresql-server
+# postgresql-setup --initdb --unit postgresql
+# systemctl start postgresql
+# systemctl enable postgresql
+```
