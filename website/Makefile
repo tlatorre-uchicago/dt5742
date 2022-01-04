@@ -14,7 +14,6 @@ install:
 	$(INSTALL) gunicorn.service /etc/systemd/system
 	$(INSTALL) nginx.conf /etc/nginx/nginx.conf
 	systemctl enable --now gunicorn.socket
-	systemctl start gunicorn
-	systemctl enable gunicorn
+	systemctl enable --now gunicorn
 
 .PHONY: install
