@@ -31,7 +31,8 @@ Now, we need to set up the database:
 # install -o postgres btl_qa.sql /var/lib/pgsql
 # su postgres
 # cd
-# psql -f btl_qa.sql
+# createdb btl_qa
+# psql btl_qa -f btl_qa.sql
 ```
 
 Now, we need to create the passwords for the three users: btl_admin, btl, and
@@ -57,6 +58,33 @@ password quickly you can use the following command:
 
 ```console
 cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10
+```
+
+Now, we need to configure the database to allow TCP connections:
+
+```
+# vim /var/lib/pgsql/data/postgresql.conf
+```
+
+and change the following line:
+
+```
+listen_addresses = '*'
+```
+
+Next, edit `vim /var/lib/pgsql/data/pg_hba.conf` and change the following line:
+
+```
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            md5
+# IPv6 local connections:
+host    all             all             ::1/128                 md5
+```
+
+Finally, restart the database:
+
+```console
+# systemctl restart postgresql
 ```
 
 Next, we install the software necessary to run the webserver:
