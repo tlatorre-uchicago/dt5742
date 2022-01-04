@@ -55,5 +55,5 @@ Change the server_name in the nginx.conf configuration file:
 Finally, run:
 
 ```console
-# make install
+$ sudo make install
 ```
