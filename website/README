@@ -25,6 +25,8 @@ Next, we install and enable the postgres server software:
 # systemctl enable postgresql
 ```
 
+Now, we need to set up the database
+
 Next, we install the software necessary to run the webserver:
 
 ```console
