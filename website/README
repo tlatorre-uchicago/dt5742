@@ -32,3 +32,15 @@ Next, we install the software necessary to run the webserver:
 # systemctl start nginx
 # systemctl enable nginx
 ```
+
+Next, change the password in `settings.txt`:
+
+```console
+# vim settings.txt
+```
+
+Finally, run:
+
+```console
+# make install
+```
