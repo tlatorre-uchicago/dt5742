@@ -6,8 +6,7 @@ collating the BTL module testing results. Data is stored in a postgres database
 that is uploaded by the analysis software in the `wavedump` directory of this
 repository. The data is then shared using a website run by Flask.
 
-Installation
-------------
+## Installation
 
 The server must be running CentOS-8. First, make sure all the available
 software is updated:
@@ -24,6 +23,8 @@ Next, we install and enable the postgres server software:
 # systemctl start postgresql
 # systemctl enable postgresql
 ```
+
+### Setting up the Database
 
 Now, we need to set up the database:
 
@@ -86,6 +87,8 @@ Finally, restart the database:
 ```console
 # systemctl restart postgresql
 ```
+
+### Configuring the Webserver
 
 Next, we install the software necessary to run the webserver:
 
