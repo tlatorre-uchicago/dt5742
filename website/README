@@ -39,6 +39,12 @@ Next, change the password in `settings.txt`:
 # vim settings.txt
 ```
 
+Change the server_name in the nginx.conf configuration file:
+
+```console
+# vim nginx.conf
+```
+
 Finally, run:
 
 ```console
