@@ -10,8 +10,10 @@ install:
 	mkdir -p /var/log/gunicorn
 	chown nginx:nginx /var/log/gunicorn
 	rsync -a --chown=nginx:nginx . /opt/btl-testing
+	$(INSTALL) gunicorn.socket /etc/systemd/system
 	$(INSTALL) gunicorn.service /etc/systemd/system
 	$(INSTALL) nginx.conf /etc/nginx/nginx.conf
+	systemctl enable --now gunicorn.socket
 	systemctl start gunicorn
 	systemctl enable gunicorn
 
