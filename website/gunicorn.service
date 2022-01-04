@@ -6,7 +6,8 @@ After=network.target
 User=nginx
 Group=nginx
 WorkingDirectory=/opt/btl-testing
-ExecStart=gunicorn --workers 3 --bind unix:/tmp/gunicorn.sock btl-testing.wsgi:application
+Environment="WEBSITE_SETTINGS=/opt/btl-testing/settings.txt"
+ExecStart=gunicorn --workers 3 --bind unix:/tmp/gunicorn.sock btl_testing.wsgi:application
 
 [Install]
 WantedBy=multi-user.target

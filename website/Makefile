@@ -6,7 +6,10 @@ INSTALL=install
 	./setup.py $@
 
 install:
-	$(INSTALL) -d -o nginx -g nginx btl-testing /opt/btl-testing
+	mkdir -p /opt/btl-testing
+	rsync -a --chown=nginx:nginx . /opt/btl-testing
 	$(INSTALL) gunicorn.service /etc/systemd/system
+	systemctl start gunicorn
+	systemctl enable gunicorn
 
 .PHONY: install

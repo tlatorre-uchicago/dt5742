@@ -21,4 +21,4 @@ def setup_logging():
         for handler in gunicorn_logger.handlers:
             app.logger.addHandler(handler)
 
-import website.views
+import btl_testing.views
