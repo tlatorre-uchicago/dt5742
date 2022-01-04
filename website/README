@@ -33,11 +33,18 @@ Next, we install the software necessary to run the webserver:
 # systemctl enable nginx
 ```
 
-Next, change the password in `settings.txt`:
+Next, create a file in this directory named `settings.txt` with the following
+information:
 
 ```console
-# vim settings.txt
+DB_USER = "cms"
+DB_HOST = "localhost"
+DB_PORT = 5432
+DB_NAME = "btl_qa"
+DB_PASS = "password"
 ```
+
+changing `password` to the default cms password for the database.
 
 Change the server_name in the nginx.conf configuration file:
 
