@@ -28,5 +28,7 @@ Next, we install and enable the postgres server software:
 Next, we install the software necessary to run the webserver:
 
 ```console
-# dnf install python3-flask python3-gunicorn python3-sqlalchemy python3-psycopg2 python3-pytz
+# dnf install python3-flask python3-gunicorn python3-sqlalchemy python3-psycopg2 python3-pytz nginx
+# systemctl start nginx
+# systemctl enable nginx
 ```
