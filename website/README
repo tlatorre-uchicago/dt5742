@@ -30,7 +30,33 @@ Now, we need to set up the database:
 ```console
 # install -o postgres btl_qa.sql /var/lib/pgsql
 # su postgres
+# cd
 # psql -f btl_qa.sql
+```
+
+Now, we need to create the passwords for the three users: btl_admin, btl, and
+cms. The btl_admin account has complete control over the database and should be
+limited to the server administrator. The btl account is for the BTL assembly
+centers and the cms account is the read only account for the website. To set up
+each of these passwords, sign in as the postgres user and run the following
+commands:
+
+```console
+# su postgres # if not already
+# psql
+postgres=# alter user btl_admin with password '';
+ALTER ROLE
+postgres=# alter user btl with password '';
+ALTER ROLE
+postgres=# alter user cms with password '';
+ALTER ROLE
+```
+
+where you need to fill in each of the passwords. If you need to create a
+password quickly you can use the following command:
+
+```console
+cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10
 ```
 
 Next, we install the software necessary to run the webserver:
