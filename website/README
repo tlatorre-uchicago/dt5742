@@ -102,6 +102,7 @@ information:
 
 ```console
 DB_USER = "cms"
+DB_BTL_USER = "btl"
 DB_HOST = "localhost"
 DB_PORT = 5432
 DB_NAME = "btl_qa"
