@@ -68,6 +68,8 @@ def time_from_now(dt):
 def upload_new_module_view():
     if request.form:
         form = ModuleUploadForm(request.form)
+    else:
+        form = ModuleUploadForm()
 
     if request.method == "POST" and form.validate():
         try:

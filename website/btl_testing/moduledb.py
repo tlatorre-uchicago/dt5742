@@ -8,9 +8,9 @@ class ModuleUploadForm(Form):
     """
     A class for the form to upload a new module.
     """
-    barcode = IntegerField('Barcode' [validators.NumberRange(min=0,max=100000)])
-    sipm = SelectField('SiPM Type', coerce=int, choices=['HPK','FBK'])
-    institution = SelectField('Assembly Institution', coerce=int, choices=['Caltech','UVA','Rome'])
+    barcode = IntegerField('Barcode', [validators.NumberRange(min=0,max=100000)])
+    sipm = SelectField('SiPM Type', coerce=int, choices=[(0,'HPK'),(1,'FBK')])
+    institution = SelectField('Assembly Institution', coerce=int, choices=[(0,'Caltech'),(1,'UVA'),(2,'Rome')])
     comments = TextAreaField('Comments', [validators.optional(), validators.length(max=10000)])
     password = PasswordField('Password')
 
@@ -24,7 +24,7 @@ def upload_new_module(form):
                             password=form.password.data)
 
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO modules (barcode, sipm, institution, comments) VALUES (%s, %s, %s, %s)", (form.data['barcode'], form.data['sipm'], form.data['institution', form.data['comments']))
+    cursor.execute("INSERT INTO modules (barcode, sipm, institution, comments) VALUES (%s, %s, %s, %s)", (form.data['barcode'], form.data['sipm'], form.data['institution'], form.data['comments']))
 
 def get_module_info(key):
     conn = engine.connect()
