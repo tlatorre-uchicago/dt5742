@@ -2,6 +2,29 @@ from .db import engine
 from .views import app
 import psycopg2
 import psycopg2.extensions
+from wtforms import Form, validators, IntegerField, SelectField, PasswordField, TextAreaField
+
+class ModuleUploadForm(Form):
+    """
+    A class for the form to upload a new module.
+    """
+    barcode = IntegerField('Barcode' [validators.NumberRange(min=0,max=100000)])
+    sipm = SelectField('SiPM Type', coerce=int, choices=['HPK','FBK'])
+    institution = SelectField('Assembly Institution', coerce=int, choices=['Caltech','UVA','Rome'])
+    comments = TextAreaField('Comments', [validators.optional(), validators.length(max=10000)])
+    password = PasswordField('Password')
+
+def upload_new_module(form):
+    """
+    Upload a new module to the database.
+    """
+    conn = psycopg2.connect(dbname=app.config['DB_NAME'],
+                            user=app.config['DB_BTL_USER'],
+                            host=app.config['DB_HOST'],
+                            password=form.password.data)
+
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO modules (barcode, sipm, institution, comments) VALUES (%s, %s, %s, %s)", (form.data['barcode'], form.data['sipm'], form.data['institution', form.data['comments']))
 
 def get_module_info(key):
     conn = engine.connect()
