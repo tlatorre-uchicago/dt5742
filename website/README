@@ -107,9 +107,17 @@ DB_HOST = "localhost"
 DB_PORT = 5432
 DB_NAME = "btl_qa"
 DB_PASS = "password"
+SECRET_KEY = [secret key]
 ```
 
-changing `password` to the default cms password for the database.
+changing `password` to the default cms password for the database. You can
+generate a secure secret key by running:
+
+```console
+$ python
+>>> import os
+>>> os.urandom(12).hex()
+```
 
 Change the server_name in the nginx.conf configuration file:
 
