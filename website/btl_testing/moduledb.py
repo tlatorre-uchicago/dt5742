@@ -9,8 +9,8 @@ class ModuleUploadForm(Form):
     A class for the form to upload a new module.
     """
     barcode = IntegerField('Barcode', [validators.NumberRange(min=0,max=100000)])
-    sipm = SelectField('SiPM Type', coerce=int, choices=[(0,'HPK'),(1,'FBK')])
-    institution = SelectField('Assembly Institution', coerce=int, choices=[(0,'Caltech'),(1,'UVA'),(2,'Rome')])
+    sipm = SelectField('SiPM Type', choices=[('HPK','HPK'),('FBK','FBK')])
+    institution = SelectField('Assembly Institution', choices=[('Caltech','Caltech'),('UVA','UVA'),('Rome','Rome')])
     comments = TextAreaField('Comments', [validators.optional(), validators.length(max=10000)])
     password = PasswordField('Password')
 
