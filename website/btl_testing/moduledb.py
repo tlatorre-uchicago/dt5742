@@ -22,6 +22,7 @@ def upload_new_module(form):
                             user=app.config['DB_BTL_USER'],
                             host=app.config['DB_HOST'],
                             password=form.password.data)
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
     cursor = conn.cursor()
     cursor.execute("INSERT INTO modules (barcode, sipm, institution, comments) VALUES (%s, %s, %s, %s)", (form.data['barcode'], form.data['sipm'], form.data['institution'], form.data['comments']))
