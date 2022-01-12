@@ -25,6 +25,7 @@ def upload_new_module(form):
 
     cursor = conn.cursor()
     cursor.execute("INSERT INTO modules (barcode, sipm, institution, comments) VALUES (%s, %s, %s, %s)", (form.data['barcode'], form.data['sipm'], form.data['institution'], form.data['comments']))
+    print(cursor.statusmessage)
 
 def get_module_info(key):
     conn = engine.connect()
@@ -39,8 +40,6 @@ def get_module_info(key):
     keys = result.keys()
     row = result.fetchone()
 
-    print(keys)
-    print(dir(result))
     return dict(zip(keys,row))
 
 def get_modules(kwargs, limit=100, sort_by=None):
