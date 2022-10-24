@@ -19,11 +19,7 @@ def ROOT_peaks(h, width=4, height=0.05, options=""):
     n_pks = spec.Search(h, width, options, height)               
     x_pos = spec.GetPositionX()
     x_pos = np.array([x_pos[i] for i in range(n_pks)])
-    if len(x_pos) != 0:
-        highest_peak = x_pos[0]
-    ind = np.argsort(x_pos)
-    x_pos = x_pos[ind]
-    return (x_pos, highest_peak)
+    return x_pos
 
 # def peaks(h, height=None, threshold=None, distance=None, prominence=None, width=None, wlen=None, rel_height=None, plateau_size=None):
 #     hist = []
@@ -81,10 +77,14 @@ def fit_511(h):
     """
     win = 0.2 * h.GetStdDev()
     # The highest peak
-    peak = ROOT_peaks(h, width=2, height=0.05, options="nobackground")[1] 
-    f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
-    r = h.Fit(f1, 'ILMSR+')
-    r = r.Get()
+    peaks = ROOT_peaks(h, width=2, height=0.001, options="nobackground")
+    f1 = None
+    thres = 200
+    if len(peaks[peaks>thres]) > 0:
+        peak = np.array(peaks)[peaks > thres][0] 
+        f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
+        r = h.Fit(f1, 'ILMSR+')
+        r = r.Get()
     
     # x_pos = ROOT_peaks(h, width=2, height=0.05, options="nobackground")[0] 
     # print("Peak charge full list:")

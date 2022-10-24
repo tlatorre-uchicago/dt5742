@@ -1665,7 +1665,8 @@ WaveDumpConfig_t set_default_settings() {
              * to Vpp. The range shifts lineraly by setting the DC offset
              * between 22000 and 48000. For example, at 35000, the range is
              * -Vpp/2 to +Vpp/2.*/
-            WDcfg.DCoffsetGrpCh[i][j] = 0x7FFF;
+            //WDcfg.DCoffsetGrpCh[i][j] = 0x7FFF;
+            WDcfg.DCoffsetGrpCh[i][j] = 22000;
         }
     }
 
@@ -2148,15 +2149,25 @@ int main(int argc, char *argv[])
         /* Page 45 of file:///home/cptlab/Downloads/UM4270_DT5742_UserManual_rev10.pdf gives
          * the instructions of how to set up self-trigger. */
         int units_per_volt = (int)pow(2, (double)BoardInfo.ADC_NBits);
-        float voltage_threshold = -0.10;
+        float voltage_threshold = -0.2;
+
         for (i = 0; i < 2; i++) {
             thresholds[i] += voltage_threshold * units_per_volt;
 
             if (thresholds[i] < 1e99) {
+                ret = CAEN_DGTZ_ReadRegister(handle, 0x1080+256*i, &data);
+
+                if (ret) {
+                    fprintf(stderr, "failed to read register 0x%04x!\n", 0x1080 + 256*i);
+                    exit(1);
+                }
+
+                data &= ~(0xfff);
+                data |= (((int) thresholds[i]) & 0xfff) | 0xf000;
                 
                 /* This sets the trigger level */
                 printf("setting trigger threshold for group %i to %i\n", i, (int) thresholds[i]);
-                ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, (int) thresholds[i]);
+                ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, data);
                 // ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, 0x500);
 
                 if (ret) {
