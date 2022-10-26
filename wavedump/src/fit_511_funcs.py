@@ -79,7 +79,7 @@ def fit_511(h):
     # The highest peak
     peaks = ROOT_peaks(h, width=2, height=0.001, options="nobackground")
     f1 = None
-    thres = 200
+    thres = 450
     if len(peaks[peaks>thres]) > 0:
         peak = np.array(peaks)[peaks > thres][0] 
         f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
@@ -115,4 +115,4 @@ def fit_511(h):
     if f1 == None:
         return None
     else:
-        return (f1.GetParameter(1), f1.GetParError(1))
+        return (f1.GetParameter(1), f1.GetParError(1), f1.GetParameter(2))

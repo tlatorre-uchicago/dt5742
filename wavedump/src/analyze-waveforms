@@ -125,7 +125,7 @@ def integrate(x, data, a, b):
     else:
         return -np.trapz(data[a:b],x=x[a:b])*1000/50.0
 
-def get_bins(x):
+def get_bins(x, chgratio = False):
     """
     Returns bins for the data `x` using the Freedman Diaconis rule. See
     https://en.wikipedia.org/wiki/Freedman%E2%80%93Diaconis_rule.
@@ -133,7 +133,9 @@ def get_bins(x):
     The equation below returns bins using said rule. A smaller bin value than
     this was chosen after finetuning for better fitting results.
     """
-    
+    if not chgratio:
+        x = np.array(x)
+        x = x[x>200]
     bin_width = 0.5*iqr(x)/(len(x)**(1/3.0))
     if bin_width == 0:
         print('Zero bin width! Quitting...', file=sys.stderr)
@@ -269,9 +271,9 @@ def plot_time_volt(x, y, channel, data_type, a, b, avg_y=None, pdf=False, filena
     plt.figure()
     plt.subplot(2,1,1)
     if charges is not None:
-        good_waveforms = y[charges < 750]
+        good_waveforms = y[charges < 800]
         plt.plot(x,good_waveforms[:100].T)
-        plt.ylabel("Voltage (V) chg<700")
+        plt.ylabel("Voltage (V) chg<800")
     else:
         plt.plot(x,y[:100].T)
         plt.ylabel("Voltage (V)")
@@ -360,11 +362,10 @@ if __name__ == '__main__':
 
     data = {}
     ch_data = {} 
-    ct_ch1 = f'ch{args.crosstalk[0]}'
-    ct_ch2 = f'ch{args.crosstalk[1]}'
+    ct_ch = f'ch{args.crosstalk[0]}'
     ct_data = {}
-    ct_thres = 0.2
-    ct_waveforms = []
+    ct_thres = 2 # number of std. dev.s
+    ct_waveforms = {}
     with h5py.File(args.filename) as f:
         root_f = ROOT.TFile(args.output, "recreate")
                 
@@ -405,8 +406,8 @@ if __name__ == '__main__':
                 print(f"Unknown group name: \"{group}\". Skipping...")
                 continue
             chs = list(f[group])
-            chs.remove(ct_ch1)
-            chs.insert(0, ct_ch1)
+            chs.remove(ct_ch)
+            chs.insert(0, ct_ch)
             for channel in chs:
                 # All relevant channels from the scope and digitizer should be
                 # in this format: 'ch<channel number>'.
@@ -436,6 +437,7 @@ if __name__ == '__main__':
                     x, y = convert_data(f, group, channel, i, i+args.chunks)
                     if group == 'sodium':
                         a, b = get_window(x,y, left=50, right=300)
+                        # Add SPE baseline subtraction method here?
                         y -= np.median(y[:,x < x[0] + 100],axis=-1)[:,np.newaxis]
                         if 'avg_pulse_y' in ch_data[channel]:
                             ch_data[channel]['avg_pulse_y'] = (ch_data[channel]['avg_pulse_count']*ch_data[channel]['avg_pulse_y'] + len(y)*np.mean(y, axis=0)) / (ch_data[channel]['avg_pulse_count'] + len(y))
@@ -454,19 +456,19 @@ if __name__ == '__main__':
                         y, high_filter_y = spe_baseline_subtraction(x, y, method=args.integration_method)                        
                         f_charge.extend(integrate(x, high_filter_y, a, b))
                     temp_charge = integrate(x,y,a,b)
-                    if channel == ct_ch2:
-                        ct_ch1_chg = np.array(ct_data[ct_ch1][len(charge):len(charge)+len(temp_charge)])
-                        mask_lower = 1 - ct_thres < ct_ch1_chg/ch_data[ct_ch1]['sodium_peak'][0]
-                        mask_upper = 1 + ct_thres > ct_ch1_chg/ch_data[ct_ch1]['sodium_peak'][0]
+                    if channel != ct_ch and ch_data[ct_ch]['sodium_peak'] is not None:
+                        ct_ch_chg = np.array(ct_data[ct_ch][len(charge):len(charge)+len(temp_charge)])
+                        ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
+                        ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
+                        mask_lower = ct_511_chg - ct_thres*ct_511_std < ct_ch_chg
+                        mask_upper = ct_511_chg + ct_thres*ct_511_std > ct_ch_chg
                         mask = np.logical_and(mask_lower, mask_upper)
-                        if len(ct_waveforms) == 0:
-                            ct_waveforms = y[mask,:]
+                        if channel not in ct_waveforms:
+                            ct_waveforms[channel] = y[mask,:]
                         else:
-                            ct_waveforms = np.append(ct_waveforms, y[mask, :], axis=0)
-                        print(np.shape(ct_waveforms))
+                            ct_waveforms[channel] = np.append(ct_waveforms[channel], y[mask, :], axis=0)
 
                     charge.extend(temp_charge)
-                    other_chg = temp_charge
                         
                 if args.plot or args.print_pdfs:
                     if group == 'sodium':
@@ -474,9 +476,9 @@ if __name__ == '__main__':
                     else:
                         # avg_y for the spe waveform is only used for plotting
                         avg_y = np.mean(y, axis=0)
-                    plot_time_volt(x, y, channel, group, a, b, avg_y=avg_y, pdf=args.print_pdfs, charges=np.array(other_chg))
-                    if channel == ct_ch2:
-                        plot_time_volt(x, ct_waveforms, channel, group, a, b, avg_y=np.median(ct_waveforms, axis=0), pdf=args.print_pdfs)
+                    plot_time_volt(x, y, channel, group, a, b, avg_y=avg_y, pdf=args.print_pdfs, charges=np.array(temp_charge))
+                    if channel != ct_ch:
+                        plot_time_volt(x, ct_waveforms[channel], channel, group, a, b, avg_y=np.median(ct_waveforms[channel], axis=0), pdf=args.print_pdfs)
                     # Plotting the filtered voltage signal. Doesn't have to be included in the final draft of this code.
                     if group == 'spe':
                         plot_time_volt(x, high_filter_y, channel, f"high filter {group}", a, b, pdf=args.print_pdfs)
@@ -554,25 +556,35 @@ if __name__ == '__main__':
                 result = cursor.execute("INSERT INTO data (channel, barcode, sodium_peak, spe, sodium_rise_time, sodium_fall_time, sodium_charge_histogram_x, sodium_charge_histogram_y, spe_charge_histogram_x, spe_charge_histogram_y, avg_pulse_x, avg_pulse_y, run) VALUES (%(channel)s, %(barcode)s, %(sodium_peak)s, %(spe)s, %(sodium_rise_time)s, %(sodium_fall_time)s, %(sodium_charge_histogram_x)s, %(sodium_charge_histogram_y)s, %(spe_charge_histogram_x)s, %(spe_charge_histogram_y)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(run)s)", ch_data[channel])
     
     # Crosstalk analysis
-    if ct_ch1 not in ct_data:
-        print(f'Missing {ct_ch1} data')
-    elif ct_ch2 not in ct_data:
-        print(f'Missing {ct_ch2} data')
-    elif ch_data[ct_ch1]['sodium_peak'] is not None and ch_data[ct_ch2]['sodium_peak'] is not None:
+    if ct_ch not in ct_data:
+        print(f'Missing {ct_ch} data for crosstalk analysis!')
+    elif ch_data[ct_ch]['sodium_peak'] is not None:
+        ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
+        ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
+        dem_norm = np.array(ct_data[ct_ch]) / ct_511_chg
+        mask_lower = ct_511_chg - ct_thres*ct_511_std < np.array(ct_data[ct_ch])
+        mask_upper = ct_511_chg + ct_thres*ct_511_std > np.array(ct_data[ct_ch])
+        mask = np.logical_and(mask_lower, mask_upper)
+
         plt.figure()
-        norm_ch1 = np.array(ct_data[ct_ch1]) / ch_data[ct_ch1]['sodium_peak'][0]
-        norm_ch2 = np.array(ct_data[ct_ch2]) / ch_data[ct_ch2]['sodium_peak'][0]
-        print(f'Sodium {ct_ch1}: {ch_data[ct_ch1]["sodium_peak"][0]}') 
-        print(f'Sodium {ct_ch2}: {ch_data[ct_ch2]["sodium_peak"][0]}') 
-        idx_511 = np.logical_and(norm_ch1 > 1-ct_thres, norm_ch1 < 1+ct_thres)
+        plt.hist(np.array(ct_data[ct_ch])[mask], bins=get_bins(np.array(ct_data[ct_ch])[mask]), histtype='step')
+        plt.suptitle(f'{ct_ch} Trigger Events for Crosstalk')
         
-        charge_ratio = norm_ch2[idx_511]/norm_ch1[idx_511]
-        if len(charge_ratio) > 0:        
-            plt.hist(charge_ratio, bins=get_bins(charge_ratio), histtype='step')
-            plt.suptitle(f'Charge {ct_ch2}/Charge {ct_ch1}')
-            plt.xlim(xmin=-0.1, xmax = 1)
-            plt.figure()
-            plt.hist(np.array(ct_data[ct_ch1])[idx_511], bins=get_bins(np.array(ct_data[ct_ch1])[idx_511]), histtype='step')
+        plt.figure()
+        for ch in ct_data:
+            print(f'{ch} sodium charge: {ch_data[ch]["sodium_peak"][0]}')
+            if ch == ct_ch:
+                continue
+
+            num_norm = np.array(ct_data[ch]) / ch_data[ch]['sodium_peak'][0]
+            
+            charge_ratio = num_norm[mask]/dem_norm[mask]
+            if len(charge_ratio) > 0:        
+                plt.hist(charge_ratio, bins=get_bins(charge_ratio, chgratio=True), histtype='step', label=f'{ch}')
+                plt.suptitle(f'Charge {ch}/Charge {ct_ch}')
+                plt.xlim(left=-0.1, right=1)
+        plt.legend()
+        plt.suptitle('Crosstalk Charge')
             
     root_f.Close()
 

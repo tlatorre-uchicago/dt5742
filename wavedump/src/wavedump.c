@@ -2068,7 +2068,7 @@ int main(int argc, char *argv[])
     static float wfdata[WF_SIZE][32][1024];
     static float bdata[BS_SIZE][32][1024];
     float baselines[32];
-    float thresholds[2];
+    float thresholds[16];
 
     int chmask = 0;
     int nsamples = 0;
@@ -2111,7 +2111,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-
+    chmask = 0xff;
     /* Do we still want to get baselines like this when there will
      * be a source in the dark box? It might average some SPEs or
      * a 511 signal */
@@ -2121,15 +2121,15 @@ int main(int argc, char *argv[])
     for (i = 0; i < 32; i++)
         printf("    ch %2i = %.0f\n", i, baselines[i]);
 
-    for (i = 0; i < 2; i++)
+    for (i = 0; i < 16; i++)
         thresholds[i] = 1e99;
 
     /* Since we have to set the offset and threshold for the whole group, we set the
      * threshold to the minimum baseline for all channels within a group. */
-    for (i = 0; i < 32; i++) {
+    for (i = 0; i < 16; i++) {
         if (chmask & (1 << i)) {
-            if (baselines[i] < thresholds[i/8])
-                thresholds[i/8] = baselines[i];
+            if (baselines[i] < thresholds[i])
+                thresholds[i] = baselines[i];
         }
     }
 
@@ -2149,31 +2149,54 @@ int main(int argc, char *argv[])
         /* Page 45 of file:///home/cptlab/Downloads/UM4270_DT5742_UserManual_rev10.pdf gives
          * the instructions of how to set up self-trigger. */
         int units_per_volt = (int)pow(2, (double)BoardInfo.ADC_NBits);
-        float voltage_threshold = -0.2;
-
-        for (i = 0; i < 2; i++) {
+        float voltage_threshold = -0.05;
+        for (i = 0; i<16; i++) {
+            int group = i/8;
+            int channel = i%8;
             thresholds[i] += voltage_threshold * units_per_volt;
-
             if (thresholds[i] < 1e99) {
-                ret = CAEN_DGTZ_ReadRegister(handle, 0x1080+256*i, &data);
+                ret = CAEN_DGTZ_ReadRegister(handle, 0x1080+256*group, &data);
 
                 if (ret) {
-                    fprintf(stderr, "failed to read register 0x%04x!\n", 0x1080 + 256*i);
+                    fprintf(stderr, "failed to read register 0x%04x!\n", 0x1080 + 256*group);
                     exit(1);
                 }
-
-                data &= ~(0xfff);
-                data |= (((int) thresholds[i]) & 0xfff) | 0xf000;
+                data &= ~(0xffff);
+                data |= (((int) thresholds[i]) & 0xfff) | (channel<<12);
                 
                 /* This sets the trigger level */
-                printf("setting trigger threshold for group %i to %i\n", i, (int) thresholds[i]);
-                ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, data);
+                printf("setting trigger threshold for channel %i to %i\n", i, (int) thresholds[i]);
+                ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*group, data);
                 // ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, 0x500);
 
                 if (ret) {
                     fprintf(stderr, "failed to write register 0x%04x!\n", 0x1080 + 256*i);
                     exit(1);
                 }
+            }
+        }
+        for (i = 0; i < 2; i++) {
+            thresholds[i] += voltage_threshold * units_per_volt;
+
+            if (thresholds[i] < 1e99) {
+                //ret = CAEN_DGTZ_ReadRegister(handle, 0x1080+256*i, &data);
+
+                //if (ret) {
+                //    fprintf(stderr, "failed to read register 0x%04x!\n", 0x1080 + 256*i);
+                //    exit(1);
+                //}
+
+                //data &= ~(0xfff);
+                //data |= (((int) thresholds[i]) & 0xfff) | 0xf000;
+                //
+                //printf("setting trigger threshold for group %i to %i\n", i, (int) thresholds[i]);
+                //ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, data);
+                //// ret = CAEN_DGTZ_WriteRegister(handle, 0x1080 + 256*i, 0x500);
+
+                //if (ret) {
+                //    fprintf(stderr, "failed to write register 0x%04x!\n", 0x1080 + 256*i);
+                //    exit(1);
+                //}
                 
                 
                 /* This sets which channels are allowed to cause a trigger event. If a channel is not
@@ -2317,7 +2340,6 @@ int main(int argc, char *argv[])
                             continue;
 
                         nsamples = Size;
-                        chmask |= 1 << (gr*8 + ch);
 
                         for (int j = 0; j < Size; j++) {
                             wfdata[nread][gr*8 + ch][j] = Event742->DataGroup[gr].DataChannel[ch][j];
