@@ -32,12 +32,12 @@ def ROOT_peaks(h, width=4, height=0.05, options=""):
 #     extrema = extrema[ind]
 #     return extrema
 
-def fit_511(h):
+def fit_511(h, charge_threshold = 400):
     """
     511 Peak Finding Strategy
         
-    We fit the highest peak with a gaussian, taking the mean of that gaussian
-    as the 511 charge.
+    We fit the highest peak above `charge_threshold` with a gaussian, taking
+    the mean of that gaussian as the 511 charge.
 
     Old Strategy: (Code commented out below. This was used when we were setting
     the trigger level too low)
@@ -79,9 +79,8 @@ def fit_511(h):
     # The highest peak
     peaks = ROOT_peaks(h, width=2, height=0.001, options="nobackground")
     f1 = None
-    thres = 450
-    if len(peaks[peaks>thres]) > 0:
-        peak = np.array(peaks)[peaks > thres][0] 
+    if len(peaks[peaks>charge_threshold]) > 0:
+        peak = np.array(peaks)[peaks > charge_threshold][0] 
         f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
         r = h.Fit(f1, 'ILMSR+')
         r = r.Get()

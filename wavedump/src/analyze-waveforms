@@ -450,13 +450,14 @@ if __name__ == '__main__':
                             ch_data[channel]['avg_pulse_x'] = x
                             ch_data[channel]['sodium_rise_time'] = get_rise_time(x, y)
                             ch_data[channel]['sodium_fall_time'] = get_fall_time(x, y)
-                        
                     elif group == 'spe':
                         a, b = get_spe_window(x, args.start_time, args.integration_time)
                         y, high_filter_y = spe_baseline_subtraction(x, y, method=args.integration_method)                        
                         f_charge.extend(integrate(x, high_filter_y, a, b))
+                    
                     temp_charge = integrate(x,y,a,b)
-                    if channel != ct_ch and ch_data[ct_ch]['sodium_peak'] is not None:
+                    
+                    if group == 'sodium' and channel != ct_ch and ch_data[ct_ch]['sodium_peak'] is not None:
                         ct_ch_chg = np.array(ct_data[ct_ch][len(charge):len(charge)+len(temp_charge)])
                         ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
                         ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
@@ -474,11 +475,13 @@ if __name__ == '__main__':
                     if group == 'sodium':
                         avg_y = ch_data[channel]['avg_pulse_y']
                     else:
-                        # avg_y for the spe waveform is only used for plotting
+                        # avg_y for everything else is only used for plotting
                         avg_y = np.mean(y, axis=0)
+                    
                     plot_time_volt(x, y, channel, group, a, b, avg_y=avg_y, pdf=args.print_pdfs, charges=np.array(temp_charge))
-                    if channel != ct_ch:
-                        plot_time_volt(x, ct_waveforms[channel], channel, group, a, b, avg_y=np.median(ct_waveforms[channel], axis=0), pdf=args.print_pdfs)
+                    
+                    if channel != ct_ch and group == 'sodium':
+                        plot_time_volt(x, ct_waveforms[channel], channel, f'{group} Crosstalk', a, b, avg_y=np.median(ct_waveforms[channel], axis=0), pdf=args.print_pdfs)
                     # Plotting the filtered voltage signal. Doesn't have to be included in the final draft of this code.
                     if group == 'spe':
                         plot_time_volt(x, high_filter_y, channel, f"high filter {group}", a, b, pdf=args.print_pdfs)
@@ -505,12 +508,12 @@ if __name__ == '__main__':
                 # Preparing Data for Upload
                 ##################
                 if args.upload:
-                    ch_data[channel]['sodium_rise_time'] = float(np.median(ch_data[channel]['sodium_rise_time']))
-                    ch_data[channel]['sodium_fall_time'] = float(np.median(ch_data[channel]['sodium_rise_time']))
-                    ch_data[channel]['avg_pulse_x'] = list(map(float,ch_data[channel]['avg_pulse_x']))
-                    ch_data[channel]['avg_pulse_y'] = list(map(float,ch_data[channel]['avg_pulse_y']))
                     bincenters = (bins[:1] + bins[:-1])/2
                     if group == 'sodium':
+                        ch_data[channel]['sodium_rise_time'] = float(np.median(ch_data[channel]['sodium_rise_time']))
+                        ch_data[channel]['sodium_fall_time'] = float(np.median(ch_data[channel]['sodium_rise_time']))
+                        ch_data[channel]['avg_pulse_x'] = list(map(float,ch_data[channel]['avg_pulse_x']))
+                        ch_data[channel]['avg_pulse_y'] = list(map(float,ch_data[channel]['avg_pulse_y']))
                         ch_data[channel]['sodium_charge_histogram_y'] = list(map(float,np.histogram(charge,bins=bins)[0]))
                         ch_data[channel]['sodium_charge_histogram_x'] = list(map(float,bincenters))
                     else:
@@ -521,12 +524,12 @@ if __name__ == '__main__':
                 # Fitting Histogram
                 ##################
                 print(f'Fitting {group} {channel}!')
-                if group == 'sodium':
-                    ch_data[channel]['sodium_peak'] = fit_511_funcs.fit_511(h)
-                else:
+                if group == 'spe':
                     model = fit_spe_funcs.vinogradov_model()
                     ch_data[channel]['spe'] = fit_spe_funcs.fit_spe(h, model, f_h=f_h)
-                
+                else:                    
+                    thres = 400
+                    ch_data[channel]['sodium_peak'] = fit_511_funcs.fit_511(h, charge_threshold=thres)
                 plot_hist(h, pdf=args.print_pdfs, filename=args.filename)
                 
     ##################
@@ -555,7 +558,9 @@ if __name__ == '__main__':
                 
                 result = cursor.execute("INSERT INTO data (channel, barcode, sodium_peak, spe, sodium_rise_time, sodium_fall_time, sodium_charge_histogram_x, sodium_charge_histogram_y, spe_charge_histogram_x, spe_charge_histogram_y, avg_pulse_x, avg_pulse_y, run) VALUES (%(channel)s, %(barcode)s, %(sodium_peak)s, %(spe)s, %(sodium_rise_time)s, %(sodium_fall_time)s, %(sodium_charge_histogram_x)s, %(sodium_charge_histogram_y)s, %(spe_charge_histogram_x)s, %(spe_charge_histogram_y)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(run)s)", ch_data[channel])
     
-    # Crosstalk analysis
+    ##################
+    # Crosstalk Analysis
+    ##################
     if ct_ch not in ct_data:
         print(f'Missing {ct_ch} data for crosstalk analysis!')
     elif ch_data[ct_ch]['sodium_peak'] is not None:
