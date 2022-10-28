@@ -12,7 +12,6 @@
 
         <title>{% block title %}{% endblock %}</title>
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" media="screen">
-        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/toastr.min.css') }}" media="screen">
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/minard.css') }}" media="screen">
         {% endblock %}
     </head>
@@ -25,11 +24,20 @@
                 <li><a href="{{ url_for(endpoint, **kwargs) }}">{{ name }}</a></li>
             {% endif %}
         {%- endmacro %}
-        <div class="navbar navbar-default navbar-static-top">
+        <div class="navbar navbar-default">
             <div class="container">
-                <div class="navbar-collapse collapse">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                </div>
+                <div class="navbar-collapse collapse" id="bs-example-navbar-collapse-1">
                     <ul class="nav navbar-nav">
-                        {{ nav_link('module_database', 'BTL Test Database') }}
+                        {{ nav_link('module_database', 'Runs') }}
+                        {{ nav_link('channel_database', 'Channels') }}
                         {{ nav_link('upload_new_module_view', 'Upload New Module') }}
                     </ul>
                 </div><!--/.navbar-collapse -->
@@ -49,7 +57,6 @@
         {% endwith %}
         {% endblock %}
         <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
-        <script src="{{ url_for('static', filename='js/toastr.min.js') }}"></script>
         <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
 
         <!-- $SCRIPT_ROOT for app location -->
@@ -58,7 +65,6 @@
         </script>
 
         <script src="{{ url_for('static', filename='js/minard.js') }}"></script>
-        <script src="{{ url_for('static', filename='js/toastr-alarms.js') }}"></script>
 
         {% block script %}{% endblock %}
     </body>
