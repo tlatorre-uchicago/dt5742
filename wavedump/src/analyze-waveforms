@@ -492,7 +492,10 @@ if __name__ == '__main__':
                 ##################
                 # Creating Histogram
                 ##################
-                bins = get_bins(charge, cutoff=200)
+                if group == 'sodium':
+                    bins = get_bins(charge, cutoff=200)
+                else:
+                    bins = get_bins(charge)
                 h = ROOT.TH1D(f"{group}_{channel}", f"{group} Charge Integral for {channel}", len(bins), bins[0], bins[-1])
                 for x in charge:
                     h.Fill(x)
@@ -587,7 +590,7 @@ if __name__ == '__main__':
             
             charge_ratio = num_norm[mask]/dem_norm[mask]
             if len(charge_ratio) > 0:        
-                plt.hist(charge_ratio, bins=get_bins(charge_ratio, chgratio=True), histtype='step', label=f'{ch}')
+                plt.hist(charge_ratio, bins=get_bins(charge_ratio), histtype='step', label=f'{ch}')
                 plt.suptitle(f'Charge {ch}/Charge {ct_ch}')
                 plt.xlim(left=-0.1, right=1)
         plt.legend()
