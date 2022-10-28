@@ -2170,7 +2170,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    chmask = 0xff;
     /* Do we still want to get baselines like this when there will
      * be a source in the dark box? It might average some SPEs or
      * a 511 signal */

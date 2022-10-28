@@ -337,7 +337,7 @@ if __name__ == '__main__':
     parser.add_argument("--print-pdfs", default=None, type=str, help="Folder to save pdfs in.")
     parser.add_argument('-u','--upload', default=False, action='store_true', help='upload results to the database')
     parser.add_argument('-i','--institution', default=None, type=Institution, choices=list(Institution), help='name of institution')
-    parser.add_argument('--crosstalk', required=True, help='Channel numbers for crosstalk comparison. `01` means select 511 events only from ch0, and analyze ch1/ch0.')
+    parser.add_argument('--crosstalk', default=None, help='Channel numbers for crosstalk comparison. `01` means select 511 events only from ch0, and analyze ch1/ch0.')
     args = parser.parse_args()
 
     if not args.plot:
@@ -364,10 +364,11 @@ if __name__ == '__main__':
 
     data = {}
     ch_data = {} 
-    ct_ch = f'ch{args.crosstalk[0]}'
-    ct_data = {}
-    ct_thres = 2 # number of std. dev.s
-    ct_waveforms = {}
+    if args.crosstalk:
+        ct_ch = f'ch{args.crosstalk[0]}'
+        ct_data = {}
+        ct_thres = 2 # number of std. dev.s
+        ct_waveforms = {}
     with h5py.File(args.filename) as f:
         root_f = ROOT.TFile(args.output, "recreate")
                 
@@ -408,8 +409,9 @@ if __name__ == '__main__':
                 print(f"Unknown group name: \"{group}\". Skipping...")
                 continue
             chs = list(f[group])
-            chs.remove(ct_ch)
-            chs.insert(0, ct_ch)
+            if args.crosstalk:
+                chs.remove(ct_ch)
+                chs.insert(0, ct_ch)
             for channel in chs:
                 # All relevant channels from the scope and digitizer should be
                 # in this format: 'ch<channel number>'.
@@ -459,7 +461,7 @@ if __name__ == '__main__':
                     
                     temp_charge = integrate(x,y,a,b)
                     
-                    if group == 'sodium' and channel != ct_ch and ch_data[ct_ch]['sodium_peak'] is not None:
+                    if args.crosstalk and group == 'sodium' and channel != ct_ch and ch_data[ct_ch]['sodium_peak'] is not None:
                         ct_ch_chg = np.array(ct_data[ct_ch][len(charge):len(charge)+len(temp_charge)])
                         ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
                         ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
@@ -472,6 +474,9 @@ if __name__ == '__main__':
                             ct_waveforms[channel] = np.append(ct_waveforms[channel], y[mask, :], axis=0)
 
                     charge.extend(temp_charge)
+                
+                if args.crosstalk and group == 'sodium':
+                    ct_data[channel] = charge
                         
                 if args.plot or args.print_pdfs:
                     if group == 'sodium':
@@ -482,13 +487,12 @@ if __name__ == '__main__':
                     
                     plot_time_volt(x, y, channel, group, a, b, avg_y=avg_y, pdf=args.print_pdfs, charges=np.array(temp_charge))
                     
-                    if channel != ct_ch and group == 'sodium':
+                    if args.crosstalk and channel != ct_ch and group == 'sodium':
                         plot_time_volt(x, ct_waveforms[channel], channel, f'{group} Crosstalk', a, b, avg_y=np.median(ct_waveforms[channel], axis=0), pdf=args.print_pdfs)
                     # Plotting the filtered voltage signal. Doesn't have to be included in the final draft of this code.
                     if group == 'spe':
                         plot_time_volt(x, high_filter_y, channel, f"high filter {group}", a, b, pdf=args.print_pdfs)
                 
-                ct_data[channel] = charge
                 ##################
                 # Creating Histogram
                 ##################
@@ -566,35 +570,36 @@ if __name__ == '__main__':
     ##################
     # Crosstalk Analysis
     ##################
-    if ct_ch not in ct_data:
-        print(f'Missing {ct_ch} data for crosstalk analysis!')
-    elif ch_data[ct_ch]['sodium_peak'] is not None:
-        ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
-        ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
-        dem_norm = np.array(ct_data[ct_ch]) / ct_511_chg
-        mask_lower = ct_511_chg - ct_thres*ct_511_std < np.array(ct_data[ct_ch])
-        mask_upper = ct_511_chg + ct_thres*ct_511_std > np.array(ct_data[ct_ch])
-        mask = np.logical_and(mask_lower, mask_upper)
+    if args.crosstalk:
+        if ct_ch not in ct_data:
+            print(f'Missing {ct_ch} data for crosstalk analysis!')
+        elif ch_data[ct_ch]['sodium_peak'] is not None:
+            ct_511_chg = ch_data[ct_ch]['sodium_peak'][0]
+            ct_511_std = ch_data[ct_ch]['sodium_peak'][2]
+            dem_norm = np.array(ct_data[ct_ch]) / ct_511_chg
+            mask_lower = ct_511_chg - ct_thres*ct_511_std < np.array(ct_data[ct_ch])
+            mask_upper = ct_511_chg + ct_thres*ct_511_std > np.array(ct_data[ct_ch])
+            mask = np.logical_and(mask_lower, mask_upper)
 
-        plt.figure()
-        plt.hist(np.array(ct_data[ct_ch])[mask], bins=get_bins(np.array(ct_data[ct_ch])[mask]), histtype='step')
-        plt.suptitle(f'{ct_ch} Trigger Events for Crosstalk')
-        
-        plt.figure()
-        for ch in ct_data:
-            print(f'{ch} sodium charge: {ch_data[ch]["sodium_peak"][0]}')
-            if ch == ct_ch:
-                continue
-
-            num_norm = np.array(ct_data[ch]) / ch_data[ch]['sodium_peak'][0]
+            plt.figure()
+            plt.hist(np.array(ct_data[ct_ch])[mask], bins=get_bins(np.array(ct_data[ct_ch])[mask]), histtype='step')
+            plt.suptitle(f'{ct_ch} Trigger Events for Crosstalk')
             
-            charge_ratio = num_norm[mask]/dem_norm[mask]
-            if len(charge_ratio) > 0:        
-                plt.hist(charge_ratio, bins=get_bins(charge_ratio), histtype='step', label=f'{ch}')
-                plt.suptitle(f'Charge {ch}/Charge {ct_ch}')
-                plt.xlim(left=-0.1, right=1)
-        plt.legend()
-        plt.suptitle('Crosstalk Charge')
+            plt.figure()
+            for ch in ct_data:
+                print(f'{ch} sodium charge: {ch_data[ch]["sodium_peak"][0]}')
+                if ch == ct_ch:
+                    continue
+
+                num_norm = np.array(ct_data[ch]) / ch_data[ch]['sodium_peak'][0]
+                
+                charge_ratio = num_norm[mask]/dem_norm[mask]
+                if len(charge_ratio) > 0:        
+                    plt.hist(charge_ratio, bins=get_bins(charge_ratio), histtype='step', label=f'{ch}')
+                    plt.suptitle(f'Charge {ch}/Charge {ct_ch}')
+                    plt.xlim(left=-0.1, right=1)
+            plt.legend()
+            plt.suptitle('Crosstalk Charge')
             
     root_f.Close()
 
