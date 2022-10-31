@@ -311,6 +311,9 @@ def plot_hist(h, pdf=False, filename=None):
             root, ext = os.path.splitext(filename)
             c.Print(os.path.join(args.print_pdfs, f"{root}_{h.GetName()}.pdf"))
 
+def auto_int(x):
+    return int(x, 0)
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
     import ROOT
@@ -328,7 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--chunks', default=10000, type=int, help='number of waveforms to process at a time')
     parser.add_argument('-t', '--integration-time', default=300, type=float, help='SPE integration length in nanoseconds.')
     parser.add_argument('-s', '--start-time',  default=50, type=float, help='start time of the SPE integration in nanoseconds.')
-    parser.add_argument('--active', default=None, help='Channels to analyze data. For example "--active 123" will analyze data from ch1, ch2, and ch3. Leaving this argument blank analyzes all channels.')
+    parser.add_argument('--channel-mask', type=auto_int, default=0xff, help='Channels to analyze data. Default is 0xff. 0x01 would only analyze channel 0.')
     parser.add_argument('--integration-method', type=int, default=1, help='Select a method of integration. Methods described in __main__')
     parser.add_argument("--print-pdfs", default=None, type=str, help="Folder to save pdfs in.")
     parser.add_argument('-u','--upload', default=False, action='store_true', help='upload results to the database')
@@ -397,29 +400,25 @@ if __name__ == '__main__':
             cursor.execute("INSERT INTO runs (voltage, institution, git_sha1, git_dirty, filename) VALUES (%(voltage)s, %(institution)s::inst, %(git_sha1)s, %(git_dirty)s, %(filename)s) RETURNING run", data)
             result = cursor.fetchone()
             run = result[0]
-        active = args.active
-        if active:
-            active = list(active)
         for group in f:
             if group != 'sodium' and group != 'spe':
                 print(f"Unknown group name: \"{group}\". Skipping...")
                 continue
-            chs = list(f[group])
+
+            # All relevant channels from the scope and digitizer should be
+            # in this format: 'ch<channel number>'.
+            chs = [ch for ch in list(f[group]) if ch.startswith('ch')]
+            
+            chs = [ch for ch in chs if args.channel_mask // 2**int(ch[2:]) % 2]
+
             if args.crosstalk:
-                chs.remove(ct_ch)
-                chs.insert(0, ct_ch)
+                if ct_ch not in chs:
+                    print('Crosstalk channel not in file or not included in channel mask!', file=sys.stderr)
+                    sys.exit(1)
+                else:
+                    chs.remove(ct_ch)
+                    chs.insert(0, ct_ch)
             for channel in chs:
-                # All relevant channels from the scope and digitizer should be
-                # in this format: 'ch<channel number>'.
-                if not channel.startswith('ch'):
-                    continue
-                
-                # Only active channel is analyzed, unless it's `None`, in which
-                # case all channels are analyzed.
-                if active:
-                    if channel[2:] not in active:
-                        continue
-                
                 if channel not in ch_data:
                     ch_data[channel] = {'channel': int(channel[2:])}
                 
