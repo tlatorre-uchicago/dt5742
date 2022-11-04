@@ -272,7 +272,7 @@ def spe_baseline_subtraction(x, y, method=1):
 def plot_time_volt(x, y, channel, data_type, a, b, avg_y=None, pdf=False, filename=None):
     plt.figure()
     plt.subplot(2,1,1)
-    plt.plot(x,y[:100].T)
+    plt.plot(x,y[:10].T)
     plt.ylabel("Voltage (V)")
     plt.xlabel("Time (ns)")
     plt.axvline(x[a])
