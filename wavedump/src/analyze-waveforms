@@ -269,7 +269,7 @@ def spe_baseline_subtraction(x, y, method=1):
         print('Not a valid integration method. Defaulting to integration method 0')
     return (y, high_filter_y)
 
-def plot_time_volt(x, y, channel, data_type, a, b, avg_y=None, pdf=False, filename=None):
+def plot_time_volt(x, y, title, a, b, avg_y=None, pdf=False, filename=None):
     plt.figure()
     plt.subplot(2,1,1)
     plt.plot(x,y[:100].T)
@@ -286,13 +286,13 @@ def plot_time_volt(x, y, channel, data_type, a, b, avg_y=None, pdf=False, filena
     plt.ylabel("Voltage (V)")
     plt.axvline(x[a])
     plt.axvline(x[b])
-    plt.suptitle(f"{data_type} {channel}")
+    plt.suptitle(title)
     if args.print_pdfs:
         if not filename:
             print('No filename specified; can not print pdf!')
         else:
             root, ext = os.path.splitext(filename)
-            plt.savefig(os.path.join(args.print_pdfs, f"{root}_{data_type}_{channel}_TimeVolt.pdf"))
+            plt.savefig(os.path.join(args.print_pdfs, f"{root}_{title}_TimeVolt.pdf"))
 
 def plot_hist(h, pdf=False, filename=None):
     global canvas
@@ -483,16 +483,16 @@ if __name__ == '__main__':
                 if args.plot or args.print_pdfs:
                     if group == 'sodium':
                         avg_y = ch_data[channel]['avg_pulse_y']
-                        plot_time_volt(x, y, channel, group, a, b, avg_y=avg_y, pdf=args.print_pdfs,)
+                        plot_time_volt(x, y, f'{channel} {group}', a, b, avg_y=avg_y, pdf=args.print_pdfs, filename=args.filename)
                     else:
-                        plot_time_volt(x, y, channel, group, a, b, pdf=args.print_pdfs,)
+                        plot_time_volt(x, y, f'{channel} {group}', a, b, pdf=args.print_pdfs, filename=args.filename)
                     
                     
                     if args.crosstalk and channel != ct_ch and group == 'sodium':
-                        plot_time_volt(x, ct_waveforms[channel], channel, f'Crosstalk in {channel} when Triggering on {ct_ch}', a, b, pdf=args.print_pdfs)
+                        plot_time_volt(x, ct_waveforms[channel], f'Crosstalk in {channel} when Triggering on {ct_ch}', a, b, pdf=args.print_pdfs, filename=args.filename)
                     # Plotting the filtered voltage signal. Doesn't have to be included in the final draft of this code.
                     if group == 'spe':
-                        plot_time_volt(x, high_filter_y, channel, f"high filter {group}", a, b, pdf=args.print_pdfs)
+                        plot_time_volt(x, high_filter_y, f"high filter {group}", a, b, pdf=args.print_pdfs, filename=args.filename)
                 
                 ##################
                 # Creating Histogram
@@ -580,7 +580,7 @@ if __name__ == '__main__':
         ct_511_chg = ch_data[dem_ch]['sodium_peak'][0]
         ct_511_std = ch_data[dem_ch]['sodium_peak'][2]
         dem_norm = np.array(ct_data[dem_ch]) / ct_511_chg
-        mask = ct_mask(ct_data[dem_ch], ct_511_chg, ct_511_std, ct_thres)
+        mask = ct_mask(np.array(ct_data[dem_ch]), ct_511_chg, ct_511_std, ct_thres)
 
         plt.figure()
         plt.hist(np.array(ct_data[dem_ch])[mask], bins=get_bins(np.array(ct_data[dem_ch])[mask]), histtype='step')
@@ -590,8 +590,8 @@ if __name__ == '__main__':
         for num_ch in ct_data:
             if num_ch == dem_ch:
                 continue
-        if ch_data[num_ch]['sodium_peak'] is None:
-            continue
+            if ch_data[num_ch]['sodium_peak'] is None:
+                continue
 
             num_norm = np.array(ct_data[num_ch]) / ch_data[num_ch]['sodium_peak'][0]
             
