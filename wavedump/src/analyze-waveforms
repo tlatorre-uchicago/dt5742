@@ -328,6 +328,7 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     import ROOT
     from ROOT import gROOT
+    from ROOT import gStyle
     import matplotlib.pyplot as plt
     import psycopg2
     import psycopg2.extensions
@@ -352,6 +353,9 @@ if __name__ == '__main__':
     if not args.plot:
         # Disables the canvas from ever popping up
         gROOT.SetBatch()
+    else:
+        # Shows fit parameters. Only shows them for the first fit however, need to fix this.
+        gStyle.SetOptFit(2)
 
     if args.upload:
         if 'BTL_DB_HOST' not in os.environ:
@@ -498,7 +502,11 @@ if __name__ == '__main__':
                 # Creating Histogram
                 ##################
                 if group == 'sodium':
-                    bins = get_bins(charge, cutoff=200)
+                    if np.max(charge) < 200:
+                        print('Warning: Abnormally low sodium charge in {channel}. 511 charge will not be accurate.')
+                        bins = get_bins(charge, cutoff=0)
+                    else:
+                        bins = get_bins(charge, cutoff=200)
                 else:
                     bins = get_bins(charge)
                 h = ROOT.TH1D(f"{group}_{channel}", f"{group} Charge Integral for {channel}", len(bins), bins[0], bins[-1])
