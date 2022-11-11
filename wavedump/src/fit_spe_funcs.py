@@ -242,6 +242,10 @@ def fit_spe(h, model, f_h=None, root_func=False):
         l = D_LAMBDA
     else:
         l = -np.log(prob_zero)
+    # The scale of the first peak (what `scale` is now) is equal to the scale
+    # for our model times the first vinogradov term:
+    scale /= vinogradov(0, l, ps)
+    
     num_peaks = min(20, max(4, poisson.ppf(0.95, l)))
 
     # SPE Charge estimated using the method from this forum:
