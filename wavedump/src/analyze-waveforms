@@ -234,12 +234,12 @@ def spe_baseline_subtraction(x, y, method=1):
     high_filter_y = high_filter_SPE(x, y)
     
     # Integration Method 0, per event median subtraction:
-    y -= np.median(y, axis=-1)[:, np.newaxis]
+    y -= np.median(y[:,x <= args.start_time], axis=-1)[:, np.newaxis]
     
     if args.integration_method == 1:  # Default 
-        cutoff = -2*iqr(high_filter_y.flatten())
-        no_SPE_mask = y > cutoff 
-        y -= np.array([np.median(y[i, no_SPE_mask[i]]) for i in range(len(y))])[:, np.newaxis]
+        #cutoff = -2*iqr(high_filter_y.flatten())
+        #no_SPE_mask = y > cutoff 
+        #y -= np.array([np.median(y[i, no_SPE_mask[i]]) for i in range(len(y))])[:, np.newaxis]
         i_mask = np.logical_and(x>=args.start_time, x<args.start_time+args.integration_time)
         y -= np.median(y[:, i_mask])
     elif args.integration_method == 2:
@@ -301,10 +301,10 @@ def plot_hist(h, pdf=False, filename=None):
     # will always make a default canvas with name `c1` the first time you
     # fit a histogram. The only way I know how to get rid of it is to
     # overwrite it like this.
-    c = ROOT.TCanvas(f'c{len(canvas)+1}')
-    canvas.append(c)
-    h.Draw()
-    c.Update()
+    #c = ROOT.TCanvas(f'c{len(canvas)+1}')
+    #canvas.append(c)
+    #h.Draw()
+    #c.Update()
     if pdf:
         if not filename:
             print('No filename specified; can not print pdf!')
@@ -339,7 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('filename',help='input filename (hdf5 format)')
     parser.add_argument('-o','--output', default='delete_me.root', help='output file name')
     parser.add_argument('--plot', default=False, action='store_true', help='plot the waveforms and charge integral')
-    parser.add_argument('--chunks', default=10000, type=int, help='number of waveforms to process at a time')
+    parser.add_argument('--chunks', default=1000, type=int, help='number of waveforms to process at a time')
     parser.add_argument('-t', '--integration-time', default=300, type=float, help='SPE integration length in nanoseconds.')
     parser.add_argument('-s', '--start-time',  default=50, type=float, help='start time of the SPE integration in nanoseconds.')
     parser.add_argument('--channel-mask', type=auto_int, default=0xff, help='Channels to analyze data. Default is 0xff. 0x01 would only analyze channel 0.')
@@ -578,10 +578,11 @@ if __name__ == '__main__':
                 ch_data[channel]['spe'] = ch_data[channel]['spe'][0] 
                 
                 result = cursor.execute("INSERT INTO data (channel, barcode, sodium_peak, spe, sodium_rise_time, sodium_fall_time, sodium_charge_histogram_x, sodium_charge_histogram_y, spe_charge_histogram_x, spe_charge_histogram_y, avg_pulse_x, avg_pulse_y, run) VALUES (%(channel)s, %(barcode)s, %(sodium_peak)s, %(spe)s, %(sodium_rise_time)s, %(sodium_fall_time)s, %(sodium_charge_histogram_x)s, %(sodium_charge_histogram_y)s, %(spe_charge_histogram_x)s, %(spe_charge_histogram_y)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(run)s)", ch_data[channel])
-    
+   
     ##################
     # Crosstalk Analysis
     ##################
+    matrix = np.matrix(np.full((8,8), None)) # Row number is the trigger channel
     for dem_ch in ct_data:
         if args.crosstalk:
             if dem_ch != ct_ch:
@@ -607,12 +608,16 @@ if __name__ == '__main__':
             num_norm = np.array(ct_data[num_ch]) / ch_data[num_ch]['sodium_peak'][0]
             
             charge_ratio = num_norm[mask]/dem_norm[mask]
+            
+            matrix[int(dem_ch[2:]), int(num_ch[2:])] = np.median(charge_ratio[charge_ratio <= np.percentile(charge_ratio, 95)])
+
             plt.hist(charge_ratio, bins=get_bins(charge_ratio), histtype='step', label=f'{num_ch}')
             plt.suptitle(f'Charge {num_ch}/Charge {dem_ch}')
             plt.xlim(left=-0.1, right=1)
         plt.legend()
         plt.suptitle(f'{dem_ch} Crosstalk Charge')
-            
+    print(matrix)
+
     root_f.Close()
 
     if args.plot:
