@@ -301,10 +301,10 @@ def plot_hist(h, pdf=False, filename=None):
     # will always make a default canvas with name `c1` the first time you
     # fit a histogram. The only way I know how to get rid of it is to
     # overwrite it like this.
-    #c = ROOT.TCanvas(f'c{len(canvas)+1}')
-    #canvas.append(c)
-    #h.Draw()
-    #c.Update()
+    c = ROOT.TCanvas(f'c{len(canvas)+1}')
+    canvas.append(c)
+    h.Draw()
+    c.Update()
     if pdf:
         if not filename:
             print('No filename specified; can not print pdf!')
@@ -496,7 +496,7 @@ if __name__ == '__main__':
                         plot_time_volt(x, ct_waveforms[channel], f'Crosstalk in {channel} when Triggering on {ct_ch}', a, b, pdf=args.print_pdfs, filename=args.filename)
                     # Plotting the filtered voltage signal. Doesn't have to be included in the final draft of this code.
                     if group == 'spe':
-                        plot_time_volt(x, high_filter_y, f"high filter {group}", a, b, pdf=args.print_pdfs, filename=args.filename)
+                        plot_time_volt(x, high_filter_y, f"{channel} high filter {group}", a, b, pdf=args.print_pdfs, filename=args.filename)
                 
                 ##################
                 # Creating Histogram
