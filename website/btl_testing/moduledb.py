@@ -49,7 +49,7 @@ def get_module_info(barcode, run=None):
 
     if row is None:
         # No module info?
-        query = "SELECT *, runs.institution as runs_institution, runs.timestamp as timestamp FROM (SELECT run, barcode, array_agg(key ORDER BY channel) as keys, array_agg(data.channel ORDER BY channel) as channels, array_agg(data.sodium_peak ORDER BY channel) as sodium_peak, array_agg(spe ORDER BY channel) as spe FROM data GROUP BY (run,barcode)) as channel, runs WHERE channel.run = runs.run"
+        query = "SELECT *, runs.institution as runs_institution, runs.timestamp as timestamp FROM (SELECT run, barcode, array_agg(key ORDER BY channel) as keys, array_agg(data.channel ORDER BY channel) as channels, array_agg(data.sodium_peak ORDER BY channel) as sodium_peak, array_agg(data.crosstalk ORDER BY channel) as crosstalk, array_agg(spe ORDER BY channel) as spe FROM data GROUP BY (run,barcode)) as channel, runs WHERE channel.run = runs.run"
 
         if run is not None:
             vars = (barcode, run)

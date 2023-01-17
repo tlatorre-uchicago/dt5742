@@ -554,32 +554,6 @@ if __name__ == '__main__':
                     plot_hist(h, pdf=args.print_pdfs, filename=args.filename)
 
     ##################
-    # Reviewing Data
-    ##################
-    for channel in ch_data:
-        if 'sodium_peak' not in ch_data[channel]:
-            print(f'Mising sodium data for {channel}!')
-        elif 'spe' not in ch_data[channel]:
-            print(f'Missing SPE data for {channel}!')
-        elif ch_data[channel]['sodium_peak'] is None:
-            print(f'Failed to fit {channel} sodium histogram!')
-        elif ch_data[channel]['spe'] is None:
-            print(f'Failed to fit {channel} spe histogram!')
-        else:
-            print(f'{channel}: {ch_data[channel]["sodium_peak"][0] / ch_data[channel]["spe"][0] / 0.511}')
-            
-            ##################
-            # Uploading Data
-            ##################
-            if args.upload:
-                # ch_data[channel]['sodium_peak'][0] is the charge value
-                # ch_data[channel]['sodium_peak'][1] is the charge error
-                ch_data[channel]['sodium_peak'] = ch_data[channel]['sodium_peak'][0] 
-                ch_data[channel]['spe'] = ch_data[channel]['spe'][0] 
-                
-                result = cursor.execute("INSERT INTO data (channel, barcode, sodium_peak, spe, sodium_rise_time, sodium_fall_time, sodium_charge_histogram_x, sodium_charge_histogram_y, spe_charge_histogram_x, spe_charge_histogram_y, avg_pulse_x, avg_pulse_y, run) VALUES (%(channel)s, %(barcode)s, %(sodium_peak)s, %(spe)s, %(sodium_rise_time)s, %(sodium_fall_time)s, %(sodium_charge_histogram_x)s, %(sodium_charge_histogram_y)s, %(spe_charge_histogram_x)s, %(spe_charge_histogram_y)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(run)s)", ch_data[channel])
-   
-    ##################
     # Crosstalk Analysis
     ##################
     matrix = np.matrix(np.full((8,8), None)) # Row number is the trigger channel
@@ -617,6 +591,33 @@ if __name__ == '__main__':
         plt.legend()
         plt.suptitle(f'{dem_ch} Crosstalk Charge')
     print(matrix)
+    
+    ##################
+    # Reviewing Data
+    ##################
+    for channel in ch_data:
+        if 'sodium_peak' not in ch_data[channel]:
+            print(f'Mising sodium data for {channel}!')
+        elif 'spe' not in ch_data[channel]:
+            print(f'Missing SPE data for {channel}!')
+        elif ch_data[channel]['sodium_peak'] is None:
+            print(f'Failed to fit {channel} sodium histogram!')
+        elif ch_data[channel]['spe'] is None:
+            print(f'Failed to fit {channel} spe histogram!')
+        else:
+            print(f'{channel}: {ch_data[channel]["sodium_peak"][0] / ch_data[channel]["spe"][0] / 0.511}')
+            
+            ##################
+            # Uploading Data
+            ##################
+            if args.upload:
+                # ch_data[channel]['sodium_peak'][0] is the charge value
+                # ch_data[channel]['sodium_peak'][1] is the charge error
+                ch_data[channel]['sodium_peak'] = ch_data[channel]['sodium_peak'][0] 
+                ch_data[channel]['spe'] = ch_data[channel]['spe'][0] 
+                ch_data[channel]['crosstalk'] = [float(val) if val is not None else None for val in matrix.A[int(channel[2:])]]
+                result = cursor.execute("INSERT INTO data (channel, barcode, sodium_peak, spe, sodium_rise_time, sodium_fall_time, sodium_charge_histogram_x, sodium_charge_histogram_y, spe_charge_histogram_x, spe_charge_histogram_y, avg_pulse_x, avg_pulse_y, run, crosstalk) VALUES (%(channel)s, %(barcode)s, %(sodium_peak)s, %(spe)s, %(sodium_rise_time)s, %(sodium_fall_time)s, %(sodium_charge_histogram_x)s, %(sodium_charge_histogram_y)s, %(spe_charge_histogram_x)s, %(spe_charge_histogram_y)s, %(avg_pulse_x)s, %(avg_pulse_y)s, %(run)s, %(crosstalk)s)", ch_data[channel])
+   
 
     root_f.Close()
 

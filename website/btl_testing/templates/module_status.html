@@ -94,6 +94,38 @@
 	<div class="row">
 	    <div class="col-md-12" id='ch-light-output'></div>
         </div>
+	<div class="row">
+	    <div class="col-md-2">
+                <h3>Crosstalk Matrix</h3>
+                <table class="table table-hover table-condensed">
+		    <thead>
+                        <tr>
+                            <th></th>
+                            <th></th>
+                            <th class="text-center", colspan="8">Crosstalk Channel</th>
+                        </tr>
+                    </thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for i in range(info['channels']|length) %}
+                            <th class="text-center">{{ info['channels'][i] }}</th>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <th class="text-center", rowspan="8">Trigger Channel</th>
+                    </tr>
+                    {% for i in range(info['channels']|length) %}
+		        <tr >
+                            <th class="text-center">{{ info['channels'][i] }}</th>
+                            {% for j in range(info['channels']|length) %}
+                                <td class="text-center">{{ "%.0f" % (info['crosstalk'][i][j]) }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
 	{% endif %}
     </div>
 {% endblock %}
