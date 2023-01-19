@@ -503,7 +503,7 @@ if __name__ == '__main__':
                 ##################
                 if group == 'sodium':
                     if np.max(charge) < 200:
-                        print('Warning: Abnormally low sodium charge in {channel}. 511 charge will not be accurate.')
+                        print(f'Warning: Abnormally low sodium charge in {channel}. 511 charge will not be accurate.')
                         bins = get_bins(charge, cutoff=0)
                     else:
                         bins = get_bins(charge, cutoff=200)
@@ -566,6 +566,7 @@ if __name__ == '__main__':
         ct_511_chg = ch_data[dem_ch]['sodium_peak'][0]
         ct_511_std = ch_data[dem_ch]['sodium_peak'][2]
         dem_norm = np.array(ct_data[dem_ch]) / ct_511_chg
+
         mask = ct_mask(np.array(ct_data[dem_ch]), ct_511_chg, ct_511_std, ct_thres)
 
         plt.figure()
