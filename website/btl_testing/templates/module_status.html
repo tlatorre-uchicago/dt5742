@@ -98,33 +98,26 @@
 	    <div class="col-md-2">
                 <h3>Crosstalk Matrix</h3>
                 <table class="table table-bordered">
-		    <thead>
-                        <tr>
-                            <th></th>
-                            <th></th>
-                            <th class="text-center", colspan="8">Crosstalk Channel</th>
-                        </tr>
-                    </thead>
                     <tr>
-                        <th></th>
-                        <th></th>
+                        <th colspan="2", rowspan="2"></th>
+                        <th class="text-center", colspan="8">Crosstalk Channel</th>
+                    </tr>
+                    <tr>
                         {% for i in range(8) %}
                             <th class="text-center">{{ i }}</th>
                         {% endfor %}
                     </tr>
                     <tr>
-                        <th class="text-center", rowspan="9">Trigger Channel</th>
+                        <th class="text-center", rowspan="9", style="vertical-align : middle;text-align:center;">Trigger Channel</th>
                     </tr>
                     {% for i in range(8) %}
 		        <tr >
                             <th class="text-center">{{ i }}</th>
                             {% for j in range(8) %}
-                                {% if i not in info['channels'] %}
-                                    <td class="text-center">?</td>
-                                {% elif info['crosstalk'][info['channels'].index(i)][j] is none %}
+                                {% if info['crosstalk'][i][j] is none %}
                                     <td class="text-center">?</td>
                                 {% else %}
-                                    <td class="text-center">{{ "%.2f" % (info['crosstalk'][info['channels'].index(i)][j]) }}</td>
+                                    <td class="text-center">{{ "%.2f" % (info['crosstalk'][i][j])}}</td>
                                 {% endif %}
                             {% endfor %}
                         </tr>
