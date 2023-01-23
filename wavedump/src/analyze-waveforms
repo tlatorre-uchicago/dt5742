@@ -347,7 +347,7 @@ if __name__ == '__main__':
     parser.add_argument("--print-pdfs", default=None, type=str, help="Folder to save pdfs in.")
     parser.add_argument('-u','--upload', default=False, action='store_true', help='upload results to the database')
     parser.add_argument('-i','--institution', default=None, type=Institution, choices=list(Institution), help='name of institution')
-    parser.add_argument('--crosstalk', default=None, help='Channel for crosstalk comparison. `0` means select 511 events only from ch0, and compare to all other channels.')
+    parser.add_argument('--crosstalk', default=None, help='Channel for crosstalk comparison. `0` means select 511 events only from ch0, and compare to all other channels. Default is to compare all possible crosstalk pairs')
     args = parser.parse_args()
 
     if not args.plot:
