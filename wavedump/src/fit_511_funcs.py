@@ -19,11 +19,7 @@ def ROOT_peaks(h, width=4, height=0.05, options=""):
     n_pks = spec.Search(h, width, options, height)               
     x_pos = spec.GetPositionX()
     x_pos = np.array([x_pos[i] for i in range(n_pks)])
-    if len(x_pos) != 0:
-        highest_peak = x_pos[0]
-    ind = np.argsort(x_pos)
-    x_pos = x_pos[ind]
-    return (x_pos, highest_peak)
+    return x_pos
 
 # def peaks(h, height=None, threshold=None, distance=None, prominence=None, width=None, wlen=None, rel_height=None, plateau_size=None):
 #     hist = []
@@ -36,12 +32,12 @@ def ROOT_peaks(h, width=4, height=0.05, options=""):
 #     extrema = extrema[ind]
 #     return extrema
 
-def fit_511(h):
+def fit_511(h, charge_threshold = 400):
     """
     511 Peak Finding Strategy
         
-    We fit the highest peak with a gaussian, taking the mean of that gaussian
-    as the 511 charge.
+    We fit the highest peak above `charge_threshold` with a gaussian, taking
+    the mean of that gaussian as the 511 charge.
 
     Old Strategy: (Code commented out below. This was used when we were setting
     the trigger level too low)
@@ -81,10 +77,13 @@ def fit_511(h):
     """
     win = 0.2 * h.GetStdDev()
     # The highest peak
-    peak = ROOT_peaks(h, width=2, height=0.05, options="nobackground")[1] 
-    f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
-    r = h.Fit(f1, 'ILMSR+')
-    r = r.Get()
+    peaks = ROOT_peaks(h, width=2, height=0.001, options="nobackground")
+    f1 = None
+    if len(peaks[peaks>charge_threshold]) > 0:
+        peak = np.array(peaks)[peaks > charge_threshold][0] 
+        f1 = ROOT.TF1("f1","gaus", peak-win, peak+win)
+        r = h.Fit(f1, 'ILMSR+')
+        r = r.Get()
     
     # x_pos = ROOT_peaks(h, width=2, height=0.05, options="nobackground")[0] 
     # print("Peak charge full list:")
@@ -115,4 +114,4 @@ def fit_511(h):
     if f1 == None:
         return None
     else:
-        return (f1.GetParameter(1), f1.GetParError(1))
+        return (f1.GetParameter(1), f1.GetParError(1), f1.GetParameter(2))

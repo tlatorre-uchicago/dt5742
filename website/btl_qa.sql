@@ -36,6 +36,7 @@ CREATE TABLE data (
     spe_charge_histogram_y  real[],
     avg_pulse_x         real[],
     avg_pulse_y         real[],
+    crosstalk           real[],
     run                 bigint NOT NULL references runs(run),
     UNIQUE (channel,run)
 );

@@ -1672,7 +1672,7 @@ WaveDumpConfig_t get_default_settings() {
              * to Vpp. The range shifts lineraly by setting the DC offset
              * between 22000 and 48000. For example, at 35000, the range is
              * -Vpp/2 to +Vpp/2.*/
-            WDcfg.DCoffsetGrpCh[i][j] = 0x55F0;
+            WDcfg.DCoffsetGrpCh[i][j] = 0x88B8;
         }
     }
 
@@ -2170,7 +2170,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-
+    
     /* Do we still want to get baselines like this when there will
      * be a source in the dark box? It might average some SPEs or
      * a 511 signal */
@@ -2397,7 +2397,7 @@ int main(int argc, char *argv[])
     }
 
     if (stop)
-        fprintf(stderr, "ctrl-c caught. writing out %i events\n", nread);
+        fprintf(stderr, "ctrl-c caught. Ending Acquisition.\n");
 
     if (nread > 0 && add_to_output_file(output_filename, label, wfdata, bdata, nread, channel_mask, nsamples, &WDcfg, gzip_compression_level, starting_channel)) {
         fprintf(stderr, "failed to write events to file!\n");
